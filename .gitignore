@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# PHP Tools
+.phpunit.result.cache
+.phpunit.cache
+phpunit.xml.bak
+phpcs.xml.bak
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# Build
+dist/
+build/
+*.zip
+
+# Coverage reports
+coverage/
+coverage-clover.xml
+coverage-html/
+coverage.serialized
+
+# Logs
+*.log
+error_log
+debug.log
+
+# Temp
+.tmp/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~

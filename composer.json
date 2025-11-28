@@ -1,0 +1,62 @@
+{
+    "name": "industrialdev/wicket-wp-guest-checkout",
+    "description": "Wicket Guest Checkout - Secure guest payment system for WooCommerce",
+    "version": "1.0.0",
+    "type": "wordpress-plugin",
+    "keywords": [
+        "wordpress",
+        "woocommerce",
+        "guest-payment",
+        "payment-link",
+        "subscription"
+    ],
+    "homepage": "https://github.com/industrialdev/wicket-wp-guest-checkout",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Wicket Inc.",
+            "email": "info@wicket.io",
+            "homepage": "https://wicket.io"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "composer/installers": "^1.0 || ^2.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Wicket\\GuestPayment\\": "src/"
+        },
+        "classmap": [
+            "src/"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Wicket\\GuestPayment\\Tests\\": "tests/unit/"
+        }
+    },
+    "scripts": {
+        "test": [
+            "@php ./vendor/bin/phpunit tests/unit/"
+        ],
+        "test-coverage": [
+            "@php ./vendor/bin/phpunit tests/unit/ --coverage-html coverage/"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts-descriptions": {
+        "test": "Run PHPUnit tests",
+        "test-coverage": "Run PHPUnit tests with HTML coverage report"
+    }
+}
