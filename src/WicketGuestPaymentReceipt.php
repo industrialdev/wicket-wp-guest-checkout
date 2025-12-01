@@ -3,378 +3,384 @@
 declare(strict_types=1);
 
 /**
- * Guest Subscription Payment Flow for WooCommerce - Receipt Management
+ * Guest Subscription Payment Flow for WooCommerce - Receipt Management.
  *
  * Handles receipt access and delivery for guest payers after payment completion.
- *
- * @package Wicket
- * @subpackage GuestPayment
  */
 
 // No direct access
 defined('ABSPATH') || exit;
 
 /**
- * Receipt management for Guest Subscription Payment Flow
+ * Receipt management for Guest Subscription Payment Flow.
  */
 class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
 {
+    /**
+     * Receipt token expiration in days.
+     *
+     * @var int
+     */
+    private int $receipt_token_expiry_days = 30;
 
-	/**
-	 * Receipt token expiration in days
-	 *
-	 * @var int
-	 */
-	private int $receipt_token_expiry_days = 30;
+    /**
+     * Constructor.
+     */
+    public function __construct()
+    {
+        // Empty constructor - intentionally
+    }
 
-	/**
-	 * Constructor
-	 */
-	public function __construct()
-	{
-		// Empty constructor - intentionally
-	}
+    /**
+     * Initializes the class.
+     *
+     * @return void
+     */
+    public function init(): void
+    {
+        // Add receipt access endpoint
+        add_action('init', [$this, 'add_receipt_endpoint']);
+        add_action('template_redirect', [$this, 'handle_receipt_request'], 10);
 
-	/**
-	 * Initializes the class
-	 *
-	 * @return void
-	 */
-	public function init(): void
-	{
-		// Add receipt access endpoint
-		add_action('init', [$this, 'add_receipt_endpoint']);
-		add_action('template_redirect', [$this, 'handle_receipt_request'], 10);
+        // Add receipt access after payment completion
+        add_action('woocommerce_payment_complete', [$this, 'generate_receipt_access_token']);
+        add_action('woocommerce_order_status_processing', [$this, 'generate_receipt_access_token']);
+        add_action('woocommerce_order_status_completed', [$this, 'generate_receipt_access_token']);
 
-		// Add receipt access after payment completion
-		add_action('woocommerce_payment_complete', [$this, 'generate_receipt_access_token']);
-		add_action('woocommerce_order_status_processing', [$this, 'generate_receipt_access_token']);
-		add_action('woocommerce_order_status_completed', [$this, 'generate_receipt_access_token']);
+        // Add AJAX handler for email receipt delivery
+        add_action('wp_ajax_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
+        add_action('wp_ajax_nopriv_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
 
-		// Add AJAX handler for email receipt delivery
-		add_action('wp_ajax_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
-		add_action('wp_ajax_nopriv_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
+        // Add post-payment receipt access section
+        add_action('woocommerce_thankyou', [$this, 'add_receipt_access_section'], 20);
+    }
 
-		// Add post-payment receipt access section
-		add_action('woocommerce_thankyou', [$this, 'add_receipt_access_section'], 20);
-	}
+    /**
+     * Adds receipt access endpoint rewrite rule.
+     *
+     * @return void
+     */
+    public function add_receipt_endpoint(): void
+    {
+        add_rewrite_rule(
+            '^guest-receipt/([a-f0-9]{64})/?$',
+            'index.php?guest_payment_token=$matches[1]&receipt_access=1',
+            'top'
+        );
 
-	/**
-	 * Adds receipt access endpoint rewrite rule
-	 *
-	 * @return void
-	 */
-	public function add_receipt_endpoint(): void
-	{
-		add_rewrite_rule(
-			'^guest-receipt/([a-f0-9]{64})/?$',
-			'index.php?guest_payment_token=$matches[1]&receipt_access=1',
-			'top'
-		);
+        add_rewrite_tag('%guest_payment_token%', '([a-f0-9]{64})');
+        add_rewrite_tag('%receipt_access%', '1');
 
-		add_rewrite_tag('%guest_payment_token%', '([a-f0-9]{64})');
-		add_rewrite_tag('%receipt_access%', '1');
+        // Flush rewrite rules if needed
+        if (get_option('wicket_guest_payment_receipt_rules_flushed') !== 'yes') {
+            flush_rewrite_rules();
+            update_option('wicket_guest_payment_receipt_rules_flushed', 'yes');
+        }
+    }
 
-		// Flush rewrite rules if needed
-		if (get_option('wicket_guest_payment_receipt_rules_flushed') !== 'yes') {
-			flush_rewrite_rules();
-			update_option('wicket_guest_payment_receipt_rules_flushed', 'yes');
-		}
-	}
+    /**
+     * Handles receipt access requests.
+     *
+     * @return void
+     */
+    public function handle_receipt_request(): void
+    {
+        // Check if this is a receipt access request
+        if (!get_query_var('receipt_access') || !get_query_var('guest_payment_token')) {
+            return;
+        }
 
-	/**
-	 * Handles receipt access requests
-	 *
-	 * @return void
-	 */
-	public function handle_receipt_request(): void
-	{
-		// Check if this is a receipt access request
-		if (!get_query_var('receipt_access') || !get_query_var('guest_payment_token')) {
-			return;
-		}
+        $token = sanitize_text_field(get_query_var('guest_payment_token'));
+        $order = $this->validate_receipt_token($token);
 
-		$token = sanitize_text_field(get_query_var('guest_payment_token'));
-		$order = $this->validate_receipt_token($token);
+        if (!$order instanceof WC_Order) {
+            wp_die(__('Invalid or expired receipt access link.', 'wicket-wgc'), __('Access Denied', 'wicket-wgc'), 403);
+        }
 
-		if (!$order instanceof WC_Order) {
-			wp_die(__('Invalid or expired receipt access link.', 'wicket-wgc'), __('Access Denied', 'wicket-wgc'), 403);
-		}
+        // Display receipt page
+        $this->display_receipt_page($order, $token);
+        exit;
+    }
 
-		// Display receipt page
-		$this->display_receipt_page($order, $token);
-		exit;
-	}
+    /**
+     * Generates a receipt access token for completed orders.
+     *
+     * @param int $order_id The order ID.
+     * @return void
+     */
+    public function generate_receipt_access_token(int $order_id): void
+    {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
 
-	/**
-	 * Generates a receipt access token for completed orders
-	 *
-	 * @param int $order_id The order ID.
-	 * @return void
-	 */
-	public function generate_receipt_access_token(int $order_id): void
-	{
-		$order = wc_get_order($order_id);
-		if (!$order) {
-			return;
-		}
+        // Check if this was a guest payment order
+        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
+        if (!$guest_email) {
+            return;
+        }
 
-		// Check if this was a guest payment order
-		$guest_email = $order->get_meta('_wgp_guest_payment_email', true);
-		if (!$guest_email) {
-			return;
-		}
+        // Check if receipt token already exists
+        $existing_token = $order->get_meta('_wgp_receipt_access_token', true);
+        if ($existing_token) {
+            // Check if existing token is still valid
+            $created_timestamp = (int) $order->get_meta('_wgp_receipt_token_created', true);
+            $expiry_timestamp = $created_timestamp + ($this->receipt_token_expiry_days * DAY_IN_SECONDS);
 
-		// Check if receipt token already exists
-		$existing_token = $order->get_meta('_wgp_receipt_access_token', true);
-		if ($existing_token) {
-			// Check if existing token is still valid
-			$created_timestamp = (int) $order->get_meta('_wgp_receipt_token_created', true);
-			$expiry_timestamp = $created_timestamp + ($this->receipt_token_expiry_days * DAY_IN_SECONDS);
+            if (time() <= $expiry_timestamp) {
+                $this->log(sprintf('Receipt token already exists and is valid for Order ID: %d', $order_id));
 
-			if (time() <= $expiry_timestamp) {
-				$this->log(sprintf('Receipt token already exists and is valid for Order ID: %d', $order_id));
-				return;
-			}
-		}
+                return;
+            }
+        }
 
-		// Generate new receipt token
-		$token = $this->generate_receipt_token();
-		if ($token && $this->store_receipt_token_data($order_id, $token)) {
-			$this->log(sprintf('Generated receipt access token for Order ID: %d', $order_id));
-		}
-	}
+        // Generate new receipt token
+        $token = $this->generate_receipt_token();
+        if ($token && $this->store_receipt_token_data($order_id, $token)) {
+            $this->log(sprintf('Generated receipt access token for Order ID: %d', $order_id));
+        }
+    }
 
-	/**
-	 * Generates a secure receipt access token
-	 *
-	 * @return string|false The generated token, or false on failure.
-	 */
-	private function generate_receipt_token(): string|false
-	{
-		try {
-			$random_bytes = random_bytes(32);
-			$token = bin2hex($random_bytes);
+    /**
+     * Generates a secure receipt access token.
+     *
+     * @return string|false The generated token, or false on failure.
+     */
+    private function generate_receipt_token(): string|false
+    {
+        try {
+            $random_bytes = random_bytes(32);
+            $token = bin2hex($random_bytes);
 
-			$this->log(sprintf('Successfully generated receipt access token of length %d.', strlen($token)));
-			return $token;
-		} catch (\Exception $e) {
-			$this->log(
-				sprintf('Failed to generate receipt access token. Error: %s.', $e->getMessage()),
-				'error'
-			);
-			return false;
-		}
-	}
+            $this->log(sprintf('Successfully generated receipt access token of length %d.', strlen($token)));
 
-	/**
-	 * Stores receipt token data as order meta
-	 *
-	 * @param int $order_id The order ID.
-	 * @param string $token The receipt token.
-	 * @return bool True on success, false on failure.
-	 */
-	private function store_receipt_token_data(int $order_id, string $token): bool
-	{
-		$order = wc_get_order($order_id);
-		if (!$order) {
-			$this->log(sprintf('Failed to fetch order for receipt token storage. Order ID: %d', $order_id), 'error');
-			return false;
-		}
+            return $token;
+        } catch (Exception $e) {
+            $this->log(
+                sprintf('Failed to generate receipt access token. Error: %s.', $e->getMessage()),
+                'error'
+            );
 
-		$timestamp = time();
+            return false;
+        }
+    }
 
-		$order->update_meta_data('_wgp_receipt_access_token', $token);
-		$order->update_meta_data('_wgp_receipt_token_created', $timestamp);
+    /**
+     * Stores receipt token data as order meta.
+     *
+     * @param int $order_id The order ID.
+     * @param string $token The receipt token.
+     * @return bool True on success, false on failure.
+     */
+    private function store_receipt_token_data(int $order_id, string $token): bool
+    {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            $this->log(sprintf('Failed to fetch order for receipt token storage. Order ID: %d', $order_id), 'error');
 
-		$saved = $order->save();
+            return false;
+        }
 
-		if ($saved) {
-			$this->log(sprintf('Receipt token stored successfully for Order ID: %d', $order_id));
-			return true;
-		} else {
-			$this->log(sprintf('Failed to save receipt token for Order ID: %d', $order_id), 'error');
-			return false;
-		}
-	}
+        $timestamp = time();
 
-	/**
-	 * Validates a receipt access token
-	 *
-	 * @param string $token The token to validate.
-	 * @return WC_Order|false The order object if valid, false otherwise.
-	 */
-	private function validate_receipt_token(string $token)
-	{
-		if (empty($token)) {
-			return false;
-		}
+        $order->update_meta_data('_wgp_receipt_access_token', $token);
+        $order->update_meta_data('_wgp_receipt_token_created', $timestamp);
 
-		// Search for order with receipt token
-		$meta_query = [
-			[
-				'key'     => '_wgp_receipt_access_token',
-				'value'   => $token,
-				'compare' => '=',
-			],
-		];
+        $saved = $order->save();
 
-		$order_query_args = [
-			'limit'      => 1,
-			'type'       => 'shop_order',
-			'status'     => ['processing', 'completed'],
-			'meta_query' => $meta_query,
-			'return'     => 'ids',
-		];
+        if ($saved) {
+            $this->log(sprintf('Receipt token stored successfully for Order ID: %d', $order_id));
 
-		$found_ids = wc_get_orders($order_query_args);
+            return true;
+        } else {
+            $this->log(sprintf('Failed to save receipt token for Order ID: %d', $order_id), 'error');
 
-		if (empty($found_ids)) {
-			$this->log(sprintf('No order found for receipt token: %s', $token));
-			return false;
-		}
+            return false;
+        }
+    }
 
-		$order_id = $found_ids[0];
-		$order = wc_get_order($order_id);
+    /**
+     * Validates a receipt access token.
+     *
+     * @param string $token The token to validate.
+     * @return WC_Order|false The order object if valid, false otherwise.
+     */
+    private function validate_receipt_token(string $token)
+    {
+        if (empty($token)) {
+            return false;
+        }
 
-		if (!$order) {
-			$this->log(sprintf('Failed to retrieve order for receipt token. Order ID: %d', $order_id), 'error');
-			return false;
-		}
+        // Search for order with receipt token
+        $meta_query = [
+            [
+                'key'     => '_wgp_receipt_access_token',
+                'value'   => $token,
+                'compare' => '=',
+            ],
+        ];
 
-		// Check token expiry
-		$created_timestamp = (int) $order->get_meta('_wgp_receipt_token_created', true);
-		$expiry_timestamp = $created_timestamp + ($this->receipt_token_expiry_days * DAY_IN_SECONDS);
+        $order_query_args = [
+            'limit'      => 1,
+            'type'       => 'shop_order',
+            'status'     => ['processing', 'completed'],
+            'meta_query' => $meta_query,
+            'return'     => 'ids',
+        ];
 
-		if (empty($created_timestamp) || time() > $expiry_timestamp) {
-			$this->log(sprintf('Receipt token expired for Order ID: %d', $order_id));
-			return false;
-		}
+        $found_ids = wc_get_orders($order_query_args);
 
-		$this->log(sprintf('Receipt token validation successful for Order ID: %d', $order_id));
-		return $order;
-	}
+        if (empty($found_ids)) {
+            $this->log(sprintf('No order found for receipt token: %s', $token));
 
-	/**
-	 * Displays the receipt page
-	 *
-	 * @param WC_Order $order The order object.
-	 * @param string $token The receipt token.
-	 * @return void
-	 */
-	private function display_receipt_page(WC_Order $order, string $token): void
-	{
-		// Set up page data
-		$order_id = $order->get_id();
-		$order_number = $order->get_order_number();
-		$order_date = $order->get_date_created();
-		$order_total = $order->get_total();
-		$billing_email = $order->get_billing_email();
-		$guest_email = $order->get_meta('_wgp_guest_payment_email', true);
+            return false;
+        }
 
-		// Load template
-		include locate_template('guest-receipt-template.php');
-	}
+        $order_id = $found_ids[0];
+        $order = wc_get_order($order_id);
 
-	/**
-	 * AJAX handler for sending receipt email
-	 *
-	 * @return void
-	 */
-	public function ajax_send_receipt_email(): void
-	{
-		// Verify nonce
-		if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wicket_send_receipt')) {
-			wp_die(__('Security check failed.', 'wicket-wgc'));
-		}
+        if (!$order) {
+            $this->log(sprintf('Failed to retrieve order for receipt token. Order ID: %d', $order_id), 'error');
 
-		$token = sanitize_text_field($_POST['token'] ?? '');
-		$email = sanitize_email($_POST['email'] ?? '');
+            return false;
+        }
 
-		if (empty($token) || !is_email($email)) {
-			wp_send_json_error([
-				'message' => __('Invalid request. Please provide a valid email address.', 'wicket-wgc')
-			]);
-		}
+        // Check token expiry
+        $created_timestamp = (int) $order->get_meta('_wgp_receipt_token_created', true);
+        $expiry_timestamp = $created_timestamp + ($this->receipt_token_expiry_days * DAY_IN_SECONDS);
 
-		$order = $this->validate_receipt_token($token);
-		if (!$order instanceof WC_Order) {
-			wp_send_json_error([
-				'message' => __('Invalid or expired receipt link.', 'wicket-wgc')
-			]);
-		}
+        if (empty($created_timestamp) || time() > $expiry_timestamp) {
+            $this->log(sprintf('Receipt token expired for Order ID: %d', $order_id));
 
-		// Send receipt email
-		$sent = $this->send_receipt_email($order, $email);
+            return false;
+        }
 
-		if ($sent) {
-			wp_send_json_success([
-				'message' => __('Receipt has been sent to your email address.', 'wicket-wgc')
-			]);
-		} else {
-			wp_send_json_error([
-				'message' => __('Failed to send receipt. Please try again or contact support.', 'wicket-wgc')
-			]);
-		}
-	}
+        $this->log(sprintf('Receipt token validation successful for Order ID: %d', $order_id));
 
-	/**
-	 * Sends receipt email to specified address
-	 *
-	 * @param WC_Order $order The order object.
-	 * @param string $email The email address to send to.
-	 * @return bool True on success, false on failure.
-	 */
-	private function send_receipt_email(WC_Order $order, string $email): bool
-	{
-		$order_id = $order->get_id();
-		$order_number = $order->get_order_number();
+        return $order;
+    }
 
-		$subject = sprintf(__('Receipt for Order #%s', 'wicket-wgc'), $order_number);
+    /**
+     * Displays the receipt page.
+     *
+     * @param WC_Order $order The order object.
+     * @param string $token The receipt token.
+     * @return void
+     */
+    private function display_receipt_page(WC_Order $order, string $token): void
+    {
+        // Set up page data
+        $order_id = $order->get_id();
+        $order_number = $order->get_order_number();
+        $order_date = $order->get_date_created();
+        $order_total = $order->get_total();
+        $billing_email = $order->get_billing_email();
+        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
 
-		// Build email content
-		$message = $this->get_receipt_email_content($order, $email);
+        // Load template
+        include locate_template('guest-receipt-template.php');
+    }
 
-		$headers = [
-			'Content-Type: text/html; charset=UTF-8',
-			'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
-		];
+    /**
+     * AJAX handler for sending receipt email.
+     *
+     * @return void
+     */
+    public function ajax_send_receipt_email(): void
+    {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wicket_send_receipt')) {
+            wp_die(__('Security check failed.', 'wicket-wgc'));
+        }
 
-		$sent = wp_mail($email, $subject, $message, $headers);
+        $token = sanitize_text_field($_POST['token'] ?? '');
+        $email = sanitize_email($_POST['email'] ?? '');
 
-		if ($sent) {
-			$this->log(sprintf('Receipt email sent successfully for Order ID: %d to %s', $order_id, $email));
-		} else {
-			$this->log(sprintf('Failed to send receipt email for Order ID: %d to %s', $order_id, $email), 'error');
-		}
+        if (empty($token) || !is_email($email)) {
+            wp_send_json_error([
+                'message' => __('Invalid request. Please provide a valid email address.', 'wicket-wgc'),
+            ]);
+        }
 
-		return $sent;
-	}
+        $order = $this->validate_receipt_token($token);
+        if (!$order instanceof WC_Order) {
+            wp_send_json_error([
+                'message' => __('Invalid or expired receipt link.', 'wicket-wgc'),
+            ]);
+        }
 
-	/**
-	 * Gets receipt email content
-	 *
-	 * @param WC_Order $order The order object.
-	 * @param string $email The recipient email.
-	 * @return string The email content.
-	 */
-	private function get_receipt_email_content(WC_Order $order, string $email): string
-	{
-		$order_id = $order->get_id();
-		$order_number = $order->get_order_number();
-		$order_date = $order->get_date_created();
-		$order_total = $order->get_formatted_order_total();
-		$receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
-		$receipt_url = home_url("/guest-receipt/{$receipt_token}/");
+        // Send receipt email
+        $sent = $this->send_receipt_email($order, $email);
 
-		// Check if PDF invoice plugin is available
-		$invoice_url = '';
-		if (class_exists('WooCommerce_PDF_Invoices')) {
-			$invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
-		}
+        if ($sent) {
+            wp_send_json_success([
+                'message' => __('Receipt has been sent to your email address.', 'wicket-wgc'),
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => __('Failed to send receipt. Please try again or contact support.', 'wicket-wgc'),
+            ]);
+        }
+    }
 
-		ob_start();
-		?>
+    /**
+     * Sends receipt email to specified address.
+     *
+     * @param WC_Order $order The order object.
+     * @param string $email The email address to send to.
+     * @return bool True on success, false on failure.
+     */
+    private function send_receipt_email(WC_Order $order, string $email): bool
+    {
+        $order_id = $order->get_id();
+        $order_number = $order->get_order_number();
+
+        $subject = sprintf(__('Receipt for Order #%s', 'wicket-wgc'), $order_number);
+
+        // Build email content
+        $message = $this->get_receipt_email_content($order, $email);
+
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>',
+        ];
+
+        $sent = wp_mail($email, $subject, $message, $headers);
+
+        if ($sent) {
+            $this->log(sprintf('Receipt email sent successfully for Order ID: %d to %s', $order_id, $email));
+        } else {
+            $this->log(sprintf('Failed to send receipt email for Order ID: %d to %s', $order_id, $email), 'error');
+        }
+
+        return $sent;
+    }
+
+    /**
+     * Gets receipt email content.
+     *
+     * @param WC_Order $order The order object.
+     * @param string $email The recipient email.
+     * @return string The email content.
+     */
+    private function get_receipt_email_content(WC_Order $order, string $email): string
+    {
+        $order_id = $order->get_id();
+        $order_number = $order->get_order_number();
+        $order_date = $order->get_date_created();
+        $order_total = $order->get_formatted_order_total();
+        $receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
+        $receipt_url = home_url("/guest-receipt/{$receipt_token}/");
+
+        // Check if PDF invoice plugin is available
+        $invoice_url = '';
+        if (class_exists('WooCommerce_PDF_Invoices')) {
+            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
+        }
+
+        ob_start();
+        ?>
 		<!DOCTYPE html>
 		<html>
 		<head>
@@ -416,42 +422,42 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
 		</body>
 		</html>
 		<?php
-		return ob_get_clean();
-	}
+        return ob_get_clean();
+    }
 
-	/**
-	 * Adds receipt access section to thank you page
-	 *
-	 * @param int $order_id The order ID.
-	 * @return void
-	 */
-	public function add_receipt_access_section(int $order_id): void
-	{
-		$order = wc_get_order($order_id);
-		if (!$order) {
-			return;
-		}
+    /**
+     * Adds receipt access section to thank you page.
+     *
+     * @param int $order_id The order ID.
+     * @return void
+     */
+    public function add_receipt_access_section(int $order_id): void
+    {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
 
-		// Check if this was a guest payment
-		$guest_email = $order->get_meta('_wgp_guest_payment_email', true);
-		if (!$guest_email) {
-			return;
-		}
+        // Check if this was a guest payment
+        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
+        if (!$guest_email) {
+            return;
+        }
 
-		// Get receipt token
-		$receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
-		if (!$receipt_token) {
-			return;
-		}
+        // Get receipt token
+        $receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
+        if (!$receipt_token) {
+            return;
+        }
 
-		$receipt_url = home_url("/guest-receipt/{$receipt_token}/");
+        $receipt_url = home_url("/guest-receipt/{$receipt_token}/");
 
-		// Check if PDF invoice plugin is available
-		$invoice_url = '';
-		if (class_exists('WooCommerce_PDF_Invoices')) {
-			$invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
-		}
+        // Check if PDF invoice plugin is available
+        $invoice_url = '';
+        if (class_exists('WooCommerce_PDF_Invoices')) {
+            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
+        }
 
-		include locate_template('guest-receipt-thankyou-section.php');
-	}
+        include locate_template('guest-receipt-thankyou-section.php');
+    }
 }

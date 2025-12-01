@@ -1,7 +1,7 @@
 {
     "name": "industrialdev/wicket-wp-guest-checkout",
     "description": "Wicket Guest Checkout - Secure guest payment system for WooCommerce",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "wordpress-plugin",
     "keywords": [
         "wordpress",
@@ -45,7 +45,8 @@
         ],
         "test-coverage": [
             "@php ./vendor/bin/phpunit tests/unit/ --coverage-html coverage/"
-        ]
+        ],
+        "cs:fix": "php-cs-fixer fix"
     },
     "config": {
         "sort-packages": true,
@@ -57,6 +58,7 @@
     "prefer-stable": true,
     "scripts-descriptions": {
         "test": "Run PHPUnit tests",
-        "test-coverage": "Run PHPUnit tests with HTML coverage report"
+        "test-coverage": "Run PHPUnit tests with HTML coverage report",
+        "cs:fix": "Run PHP CS Fixer to fix coding standards issues"
     }
 }
