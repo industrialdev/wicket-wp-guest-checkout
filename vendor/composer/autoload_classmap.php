@@ -1579,6 +1579,7 @@ return array(
     'WicketGuestPayment' => $baseDir . '/src/WicketGuestPayment.php',
     'WicketGuestPaymentAdmin' => $baseDir . '/src/WicketGuestPaymentAdmin.php',
     'WicketGuestPaymentAuth' => $baseDir . '/src/WicketGuestPaymentAuth.php',
+    'WicketGuestPaymentComponent' => $baseDir . '/src/WicketGuestPaymentComponent.php',
     'WicketGuestPaymentCore' => $baseDir . '/src/WicketGuestPaymentCore.php',
     'WicketGuestPaymentEmail' => $baseDir . '/src/WicketGuestPaymentEmail.php',
     'WicketGuestPaymentInvoice' => $baseDir . '/src/WicketGuestPaymentInvoice.php',

@@ -3,12 +3,13 @@
  * Plugin Name: Wicket Guest Checkout
  * Plugin URI: https://github.com/wicket/wicket-guest-checkout
  * Description: Guest payment system for WooCommerce orders. Allows admins to generate secure payment links that can be shared with guests to complete payment on behalf of a registered user.
- * Version: 1.0.1
+ * Version: 1.0.3
  * Author: Wicket Inc.
  * Author URI: https://wicket.io
  * Requires at least: 6.0
  * Tested up to: 6.7
  * Requires PHP: 8.2
+ * Requires Plugins: wicket-wp-base-plugin, woocommerce
  * WC requires at least: 10.0
  * WC tested up to: 10.0
  * Text Domain: wicket-wgc

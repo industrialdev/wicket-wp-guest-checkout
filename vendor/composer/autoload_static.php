@@ -1628,6 +1628,7 @@ class ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01
         'WicketGuestPayment' => __DIR__ . '/../..' . '/src/WicketGuestPayment.php',
         'WicketGuestPaymentAdmin' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdmin.php',
         'WicketGuestPaymentAuth' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAuth.php',
+        'WicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/WicketGuestPaymentComponent.php',
         'WicketGuestPaymentCore' => __DIR__ . '/../..' . '/src/WicketGuestPaymentCore.php',
         'WicketGuestPaymentEmail' => __DIR__ . '/../..' . '/src/WicketGuestPaymentEmail.php',
         'WicketGuestPaymentInvoice' => __DIR__ . '/../..' . '/src/WicketGuestPaymentInvoice.php',
