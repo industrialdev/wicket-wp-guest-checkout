@@ -51,6 +51,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         add_action('woocommerce_order_status_processing', [$this, 'handle_payment_completion']);
         add_action('woocommerce_order_status_completed', [$this, 'handle_payment_completion']);
 
+        // Guard cart contents before other extensions manipulate pricing
+        add_action('woocommerce_before_calculate_totals', [$this, 'guard_guest_cart_products'], 1, 1);
         // Ensure custom pricing is applied before totals are calculated
         add_action('woocommerce_before_calculate_totals', [$this, 'set_custom_cart_item_price'], 99, 1);
 
@@ -68,17 +70,23 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     public function set_custom_cart_item_price(WC_Cart $cart): void
     {
         // Check if we're in a guest payment session
-        if (!isset($_COOKIE['wordpress_logged_in_order'])) {
+        if (!$this->has_guest_session_cookie()) {
             return;
         }
 
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            // Validate product data object exists
+            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
+                continue;
+            }
+
             // Check if this item has a custom price stored
             if (isset($cart_item['custom_price']) && $cart_item['custom_price'] > 0) {
                 // Set the product price to the custom price
                 $cart_item['data']->set_price($cart_item['custom_price']);
                 $this->log(
-                    sprintf('Set custom price %s for product %d in cart item %s', $cart_item['custom_price'], $cart_item['product_id'], $cart_item_key)
+                    sprintf('Set custom price %s for product %d in cart item %s', $cart_item['custom_price'], $cart_item['product_id'], $cart_item_key),
+                    'debug'
                 );
             }
         }
@@ -96,7 +104,12 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     public function set_cart_item_custom_price_from_session(array $cart_item, array $session_values, string $cart_item_key): array
     {
         // Check if we're in a guest payment session
-        if (!isset($_COOKIE['wordpress_logged_in_order'])) {
+        if (!$this->has_guest_session_cookie()) {
+            return $cart_item;
+        }
+
+        // Validate product data object exists
+        if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
             return $cart_item;
         }
 
@@ -105,7 +118,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             // Set the product price to the custom price
             $cart_item['data']->set_price($cart_item['custom_price']);
             $this->log(
-                sprintf('Set custom price %s for product %d from session in cart item %s', $cart_item['custom_price'], $cart_item['product_id'], $cart_item_key)
+                sprintf('Set custom price %s for product %d from session in cart item %s', $cart_item['custom_price'], $cart_item['product_id'], $cart_item_key),
+                'debug'
             );
         }
 
@@ -130,7 +144,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // Check if the Auth class has already processed this token
         // We use the presence of the guest session cookie as an indicator
-        if (isset($_COOKIE['wordpress_logged_in_order'])) {
+        if ($this->has_guest_session_cookie()) {
             // Auth class has already handled this, so we should not process it again
             $this->log('Token already processed by Auth class. Skipping duplicate processing.');
 
@@ -172,6 +186,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
     /**
      * Clears the current cart and populates it with items from the specified order.
+     * Includes validation for variable products to prevent invalid cart items.
      *
      * @param WC_Order $order The order to prepare the cart from.
      * @return bool True if the cart was successfully prepared, false otherwise.
@@ -257,21 +272,44 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             $quantity = $item->get_quantity();
             $variation_id = $item->get_variation_id();
 
-            // Verify product exists before trying to add it
-            $product = wc_get_product($variation_id ? $variation_id : $product_id);
-            if (!$product || !$product->exists()) {
+            // Log raw order item data for debugging variable product issues
+            $this->log(
+                sprintf(
+                    'Order item %d: product_id=%d, variation_id=%d, type=%s',
+                    $item_id,
+                    $product_id,
+                    $variation_id,
+                    $item->get_type()
+                ),
+                'debug'
+            );
 
+            // Determine which product to use (variation or parent)
+            $target_product_id = $variation_id > 0 ? $variation_id : $product_id;
+            $product = wc_get_product($target_product_id);
+
+            // Verify product exists
+            if (!$product || !$product->exists()) {
                 $this->log(
                     sprintf('Product %d (variation: %d) in Order ID: %d no longer exists', $product_id, $variation_id, $order->get_id()),
                     'error'
                 );
-
                 wc_add_notice(sprintf(__('Product in this order is no longer available. Please contact support. (Reference: %d)', 'wicket-wgc'), $product_id), 'error');
-                continue; // Try to add other products instead of failing completely
+                continue;
             }
 
-            // Log product type and details for debugging
+            // CRITICAL: Check if this is a variable product without a variation ID
+            // This prevents the Addify fatal error caused by invalid cart items
+            if (($product->is_type('variable') || $product->is_type('variable-subscription')) && $variation_id <= 0) {
+                $this->log(
+                    sprintf('Skipping variable product %d: No variation ID specified in order item (Order ID: %d)', $product_id, $order->get_id()),
+                    'error'
+                );
+                wc_add_notice(sprintf(__('A variable product in this order is missing required options. Please contact support. (Reference: %d)', 'wicket-wgc'), $product_id), 'error');
+                continue;
+            }
 
+            // Log product details
             $this->log(
                 sprintf(
                     'Product details - ID: %d, Type: %s, Purchasable: %s, Stock Status: %s',
@@ -279,7 +317,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                     $product->get_type(),
                     $product->is_purchasable() ? 'Yes' : 'No',
                     $product->get_stock_status()
-                )
+                ),
+                'debug'
             );
 
             try {
@@ -935,13 +974,15 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     }
 
     /**
-     * Gets the expiry date for a token created now.
+     * Gets the expiry timestamp for a token.
      *
+     * @param int|null $created_timestamp Optional. The timestamp when the token was created. If null, uses current time.
      * @return int Timestamp when the token will expire.
      */
-    public function get_token_expiry_timestamp(): int
+    public function get_token_expiry_timestamp(?int $created_timestamp = null): int
     {
-        return time() + ($this->token_expiry_days * DAY_IN_SECONDS);
+        $base_time = $created_timestamp ?? time();
+        return $base_time + ($this->token_expiry_days * DAY_IN_SECONDS);
     }
 
     /**
@@ -1237,5 +1278,143 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         return $decrypted; // Returns false on failure
+    }
+
+    /**
+     * Removes cart items without valid products during guest sessions.
+     * This prevents third-party pricing hooks from operating on false objects.
+     *
+     * @param WC_Cart $cart The WooCommerce cart object.
+     * @return void
+     */
+    public function guard_guest_cart_products(WC_Cart $cart): void
+    {
+        if (!$this->is_guest_payment_session()) {
+            return;
+        }
+
+        $this->log('Guard: Starting cart validation for guest payment session.', 'debug');
+
+        $removed_items = false;
+        $cart_contents = $cart->get_cart();
+
+        $this->log(sprintf('Guard: Found %d items in cart to validate.', count($cart_contents)), 'debug');
+
+        foreach ($cart_contents as $cart_item_key => $cart_item) {
+            $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
+            $variation_id = isset($cart_item['variation_id']) ? (int) $cart_item['variation_id'] : 0;
+
+            $this->log(
+                sprintf('Guard: Checking cart item %s - Product ID: %d, Variation ID: %d', $cart_item_key, $product_id, $variation_id),
+                'debug'
+            );
+
+            // 1. Validate Product ID
+            if ($product_id <= 0) {
+                $cart->remove_cart_item($cart_item_key);
+                $this->log(sprintf('Guard: REMOVED cart item %s: Missing product ID.', $cart_item_key), 'warning');
+                $removed_items = true;
+                continue;
+            }
+
+            // 2. Validate data object exists first
+            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
+                $this->log(
+                    sprintf('Guard: Cart item %s has invalid data object. Type: %s', $cart_item_key, isset($cart_item['data']) ? gettype($cart_item['data']) : 'not set'),
+                    'warning'
+                );
+
+                // Try to load the correct product
+                $target_id = $variation_id > 0 ? $variation_id : $product_id;
+                $product = wc_get_product($target_id);
+
+                if ($product && $product->exists()) {
+                    $cart_contents[$cart_item_key]['data'] = $product;
+                    $this->log(sprintf('Guard: Rehydrated data object for cart item %s with product %d', $cart_item_key, $target_id), 'debug');
+                } else {
+                    $cart->remove_cart_item($cart_item_key);
+                    $this->log(sprintf('Guard: REMOVED cart item %s: Could not load product %d', $cart_item_key, $target_id), 'error');
+                    $removed_items = true;
+                    continue;
+                }
+            }
+
+            // 3. Validate Parent Product Exists
+            $parent_product = wc_get_product($product_id);
+            if (!$parent_product || !$parent_product->exists()) {
+                $cart->remove_cart_item($cart_item_key);
+                $this->log(sprintf('Guard: REMOVED cart item %s: Parent product %d not found.', $cart_item_key, $product_id), 'warning');
+                $removed_items = true;
+                continue;
+            }
+
+            // 4. Strict Variable Product Validation
+            if ($parent_product->is_type('variable') || $parent_product->is_type('variable-subscription')) {
+                if ($variation_id <= 0) {
+                    $cart->remove_cart_item($cart_item_key);
+                    $this->log(sprintf('Guard: REMOVED cart item %s: Variable product %d has no variation ID.', $cart_item_key, $product_id), 'warning');
+                    $removed_items = true;
+                    continue;
+                }
+
+                $variation_product = wc_get_product($variation_id);
+                if (!$variation_product || !$variation_product->exists()) {
+                    $cart->remove_cart_item($cart_item_key);
+                    $this->log(sprintf('Guard: REMOVED cart item %s: Variation %d not found for product %d.', $cart_item_key, $variation_id, $product_id), 'warning');
+                    $removed_items = true;
+                    continue;
+                }
+
+                // Ensure data object is the variation, not the parent
+                if ($cart_contents[$cart_item_key]['data']->get_id() !== $variation_id) {
+                    $cart_contents[$cart_item_key]['data'] = $variation_product;
+                    $this->log(sprintf('Guard: Updated data object to variation %d for cart item %s', $variation_id, $cart_item_key), 'debug');
+                }
+            }
+
+            $this->log(sprintf('Guard: Cart item %s validated successfully.', $cart_item_key), 'debug');
+        }
+
+        // Persist any data updates performed above (like rehydrating 'data')
+        $cart->set_cart_contents($cart_contents);
+
+        $this->log(sprintf('Guard: Validation complete. Removed items: %s', $removed_items ? 'Yes' : 'No'), 'debug');
+
+        if ($removed_items) {
+            wc_add_notice(__('One or more unavailable items were removed from your cart. Please review before continuing.', 'wicket-wgc'), 'error');
+        }
+    }
+
+    /**
+     * Determines whether the current request is part of an active guest payment session.
+     *
+     * @return bool True if in guest payment session, false otherwise.
+     */
+    private function is_guest_payment_session(): bool
+    {
+        if ($this->has_guest_session_cookie()) {
+            return true;
+        }
+
+        $user_id = get_current_user_id();
+        if ($user_id) {
+            $session_flag = get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
+            if (!empty($session_flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if the guest session cookie is set and valid.
+     *
+     * @return bool True if guest session cookie exists, false otherwise.
+     */
+    private function has_guest_session_cookie(): bool
+    {
+        return isset($_COOKIE['wordpress_logged_in_order']) &&
+               !empty(sanitize_text_field(wp_unslash($_COOKIE['wordpress_logged_in_order'])));
     }
 }
