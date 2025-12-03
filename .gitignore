@@ -39,3 +39,4 @@ tmp/
 *.bak
 *.swp
 *~
+.php-cs-fixer.cache

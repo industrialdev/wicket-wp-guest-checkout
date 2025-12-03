@@ -11,6 +11,4 @@ defined('ABSPATH') || exit;
  * Currently a thin wrapper over AbstractWicketGuestPaymentComponent so the
  * legacy class name expected by the plugin continues to exist.
  */
-class WicketGuestPaymentComponent extends AbstractWicketGuestPaymentComponent
-{
-}
+class WicketGuestPaymentComponent extends AbstractWicketGuestPaymentComponent {}

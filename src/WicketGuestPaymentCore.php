@@ -397,7 +397,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                     // Ensure product is purchasable before adding to cart
                     if (!$product || !$product->exists() || !$product->is_purchasable()) {
                         $this->log(
-                            sprintf('Product %d is not purchasable - skipping. Status: %s, Exists: %s',
+                            sprintf(
+                                'Product %d is not purchasable - skipping. Status: %s, Exists: %s',
                                 $product_id,
                                 $product ? $product->get_status() : 'N/A',
                                 $product ? ($product->exists() ? 'Yes' : 'No') : 'N/A'
@@ -1433,8 +1434,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      */
     public function has_guest_session_cookie(): bool
     {
-        return isset($_COOKIE['wordpress_logged_in_order']) &&
-               !empty(sanitize_text_field(wp_unslash($_COOKIE['wordpress_logged_in_order'])));
+        return isset($_COOKIE['wordpress_logged_in_order'])
+               && !empty(sanitize_text_field(wp_unslash($_COOKIE['wordpress_logged_in_order'])));
     }
 
     /**
@@ -1453,8 +1454,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // Disable WooCommerce's built-in cart validation that removes items
         // We handle validation in guard_guest_cart_products instead
-        remove_action('woocommerce_check_cart_items', array(WC()->cart, 'check_cart_items'), 1);
-        remove_action('woocommerce_check_cart_items', array(WC()->cart, 'check_cart_coupons'), 1);
+        remove_action('woocommerce_check_cart_items', [WC()->cart, 'check_cart_items'], 1);
+        remove_action('woocommerce_check_cart_items', [WC()->cart, 'check_cart_coupons'], 1);
 
         $this->log('Disabled WooCommerce native cart validation for guest session', 'debug');
 

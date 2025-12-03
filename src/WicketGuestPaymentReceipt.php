@@ -278,8 +278,21 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         $billing_email = $order->get_billing_email();
         $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
 
-        // Load template
-        include locate_template('guest-receipt-template.php');
+        $receipt_url = home_url("/guest-receipt/{$token}/");
+
+        $invoice_url = '';
+        if (class_exists('WooCommerce_PDF_Invoices')) {
+            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
+        }
+
+        $template = $this->resolve_template('guest-receipt-template.php');
+
+        if (!$template) {
+            $this->log('Guest receipt template could not be located.', 'error');
+            wp_die(__('Unable to load receipt template.', 'wicket-wgc'), __('Template Error', 'wicket-wgc'), 500);
+        }
+
+        include $template;
     }
 
     /**
@@ -381,47 +394,47 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
 
         ob_start();
         ?>
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<meta charset="UTF-8">
-			<title><?php echo esc_html(__('Receipt', 'wicket-wgc')); ?></title>
-		</head>
-		<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-			<div style="background: #f8f9fa; padding: 30px; border-radius: 8px;">
-				<h2 style="color: #333; margin-bottom: 20px;"><?php echo esc_html(get_bloginfo('name')); ?></h2>
-				<h1 style="color: #0073aa; margin-bottom: 10px;"><?php echo esc_html(__('Payment Receipt', 'wicket-wgc')); ?></h1>
-				<p style="color: #666; margin-bottom: 30px;"><?php echo esc_html(__('Thank you for your payment. Here is your receipt confirmation.', 'wicket-wgc')); ?></p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title><?php echo esc_html(__('Receipt', 'wicket-wgc')); ?></title>
+        </head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 8px;">
+                <h2 style="color: #333; margin-bottom: 20px;"><?php echo esc_html(get_bloginfo('name')); ?></h2>
+                <h1 style="color: #0073aa; margin-bottom: 10px;"><?php echo esc_html(__('Payment Receipt', 'wicket-wgc')); ?></h1>
+                <p style="color: #666; margin-bottom: 30px;"><?php echo esc_html(__('Thank you for your payment. Here is your receipt confirmation.', 'wicket-wgc')); ?></p>
 
-				<div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
-					<h3 style="color: #333; margin-top: 0;"><?php echo esc_html(__('Order Details', 'wicket-wgc')); ?></h3>
-					<p><strong><?php echo esc_html(__('Order Number:', 'wicket-wgc')); ?></strong> <?php echo esc_html($order_number); ?></p>
-					<p><strong><?php echo esc_html(__('Date:', 'wicket-wgc')); ?></strong> <?php echo esc_html($order_date ? $order_date->format('F j, Y') : ''); ?></p>
-					<p><strong><?php echo esc_html(__('Total Paid:', 'wicket-wgc')); ?></strong> <?php echo wp_kses_post($order_total); ?></p>
-				</div>
+                <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+                    <h3 style="color: #333; margin-top: 0;"><?php echo esc_html(__('Order Details', 'wicket-wgc')); ?></h3>
+                    <p><strong><?php echo esc_html(__('Order Number:', 'wicket-wgc')); ?></strong> <?php echo esc_html($order_number); ?></p>
+                    <p><strong><?php echo esc_html(__('Date:', 'wicket-wgc')); ?></strong> <?php echo esc_html($order_date ? $order_date->format('F j, Y') : ''); ?></p>
+                    <p><strong><?php echo esc_html(__('Total Paid:', 'wicket-wgc')); ?></strong> <?php echo wp_kses_post($order_total); ?></p>
+                </div>
 
-				<div style="text-align: center; margin: 30px 0;">
-					<?php if ($invoice_url): ?>
-						<a href="<?php echo esc_url($invoice_url); ?>"
-						   style="display: inline-block; background: #0073aa; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-bottom: 10px;"
-						   target="_blank">
-							<?php echo esc_html(__('Download PDF Receipt', 'wicket-wgc')); ?>
-						</a>
-						<br>
-					<?php endif; ?>
-					<a href="<?php echo esc_url($receipt_url); ?>"
-					   style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
-						<?php echo esc_html(__('View Receipt Online', 'wicket-wgc')); ?>
-					</a>
-				</div>
+                <div style="text-align: center; margin: 30px 0;">
+                    <?php if ($invoice_url): ?>
+                        <a href="<?php echo esc_url($invoice_url); ?>"
+                           style="display: inline-block; background: #0073aa; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-bottom: 10px;"
+                           target="_blank">
+                            <?php echo esc_html(__('Download PDF Receipt', 'wicket-wgc')); ?>
+                        </a>
+                        <br>
+                    <?php endif; ?>
+                    <a href="<?php echo esc_url($receipt_url); ?>"
+                       style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
+                        <?php echo esc_html(__('View Receipt Online', 'wicket-wgc')); ?>
+                    </a>
+                </div>
 
-				<p style="color: #666; font-size: 14px; text-align: center;">
-					<?php echo esc_html(__('This receipt link will remain accessible for 30 days.', 'wicket-wgc')); ?>
-				</p>
-			</div>
-		</body>
-		</html>
-		<?php
+                <p style="color: #666; font-size: 14px; text-align: center;">
+                    <?php echo esc_html(__('This receipt link will remain accessible for 30 days.', 'wicket-wgc')); ?>
+                </p>
+            </div>
+        </body>
+        </html>
+        <?php
         return ob_get_clean();
     }
 
@@ -458,6 +471,37 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
         }
 
-        include locate_template('guest-receipt-thankyou-section.php');
+        $template = $this->resolve_template('guest-receipt-thankyou-section.php');
+
+        if (!$template) {
+            $this->log('Guest receipt thank you template could not be located.', 'error');
+
+            return;
+        }
+
+        include $template;
+    }
+
+    /**
+     * Resolves a template path from the theme or plugin fallback.
+     *
+     * @param string $template_name Template filename.
+     * @return string|null Absolute path if found, null otherwise.
+     */
+    private function resolve_template(string $template_name): ?string
+    {
+        $theme_template = locate_template($template_name);
+
+        if (!empty($theme_template)) {
+            return $theme_template;
+        }
+
+        $plugin_template = WICKET_GUEST_CHECKOUT_PATH . 'templates/' . $template_name;
+
+        if (file_exists($plugin_template)) {
+            return $plugin_template;
+        }
+
+        return null;
     }
 }
