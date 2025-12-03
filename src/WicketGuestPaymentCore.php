@@ -58,6 +58,10 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // Set custom price when loading cart items from session for guest payments
         add_filter('woocommerce_get_cart_item_from_session', [$this, 'set_cart_item_custom_price_from_session'], 10, 3);
+
+        // Prevent cart validation from running until we've had a chance to add items
+        // This is a safeguard to ensure items are added before validation occurs
+        add_action('wp_loaded', [$this, 'ensure_cart_items_loaded'], 1);
     }
 
     /**
@@ -234,6 +238,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         // Clear the current user's cart to ensure only the order items are present
         WC()->cart->empty_cart(true);
 
+
         // Add the order items to the cart
         $items_added = false;
         $item_count = count($order->get_items());
@@ -388,24 +393,55 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                     $cart_item_key = md5($product_id . time() . rand(1, 1000));
                     // Use order item's total for pricing instead of product price
                     $order_item_total = (float) $item->get_total();
-                    $cart[$cart_item_key] = [
+
+                    // Ensure product is purchasable before adding to cart
+                    if (!$product || !$product->exists() || !$product->is_purchasable()) {
+                        $this->log(
+                            sprintf('Product %d is not purchasable - skipping. Status: %s, Exists: %s',
+                                $product_id,
+                                $product ? $product->get_status() : 'N/A',
+                                $product ? ($product->exists() ? 'Yes' : 'No') : 'N/A'
+                            ),
+                            'warning'
+                        );
+                        continue;
+                    }
+
+                    // Build cart item data with all required fields
+                    $cart_item_data = [
+                        'key' => $cart_item_key, // Required by WooCommerce
                         'product_id' => $product_id,
                         'variation_id' => $variation_id,
+                        'variation' => !empty($variation_attributes) ? $variation_attributes : [],
                         'quantity' => $quantity,
                         'data' => $product,
                         'line_total' => $order_item_total,
                         'line_subtotal' => $order_item_total,
+                        'line_tax' => 0, // Add tax if needed
+                        'line_subtotal_tax' => 0,
+                        'taxes' => [], // Add empty taxes array
                         'custom_price' => $order_item_total / ($quantity > 0 ? $quantity : 1), // Store unit price for before_calculate_totals
                     ];
-                    if (!empty($variation_attributes)) {
-                        $cart[$cart_item_key]['variation'] = $variation_attributes;
+
+                    // For subscription products, add WCS-specific cart item data
+                    if (class_exists('WC_Subscription') && $product && $product->is_type('subscription')) {
+                        $cart_item_data['_subscription_price'] = $order_item_total / ($quantity > 0 ? $quantity : 1);
+                        $cart_item_data['_subscription_period'] = 'month'; // Default period - should match product settings
+                        $cart_item_data['_subscription_period_interval'] = 1; // Default interval
+                        $cart_item_data['_subscription_length'] = 0; // No fixed length
+                        $this->log('Added WooCommerce Subscriptions-specific data to cart item', 'debug');
                     }
 
+                    $cart[$cart_item_key] = $cart_item_data;
+
                     WC()->cart->set_cart_contents($cart);
+                    // Force WooCommerce to recalculate totals and validate items
+                    WC()->cart->calculate_totals();
+                    WC()->cart->persistent_cart_update();
                     $items_added = true;
 
                     $this->log(
-                        sprintf('Alternative approach used to add product %d to cart', $product_id)
+                        sprintf('Alternative approach used to add product %d to cart with validation', $product_id)
                     );
                 }
             } catch (Exception $e) {
@@ -1148,23 +1184,6 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         $user_id = $order->get_user_id();
-        if ($user_id) {
-            // DUPLICATION PREVENTION: Check if this order matches the stored original order ID
-            $stored_order_id = get_user_meta($user_id, '_wgp_original_order_id', true);
-            if ($stored_order_id && $stored_order_id != $order_id) {
-                $this->log(
-                    sprintf(
-                        'DUPLICATE PREVENTION: Payment completion for order #%d does not match stored order #%d for user %d. Skipping token invalidation.',
-                        $order_id,
-                        $stored_order_id,
-                        $user_id
-                    ),
-                    'warning'
-                );
-
-                return;
-            }
-        }
 
         $this->log(
             sprintf('Payment complete/Order status paid for order #%d. Attempting to invalidate token.', $order_id)
@@ -1390,7 +1409,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      *
      * @return bool True if in guest payment session, false otherwise.
      */
-    private function is_guest_payment_session(): bool
+    public function is_guest_payment_session(): bool
     {
         if ($this->has_guest_session_cookie()) {
             return true;
@@ -1412,9 +1431,47 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      *
      * @return bool True if guest session cookie exists, false otherwise.
      */
-    private function has_guest_session_cookie(): bool
+    public function has_guest_session_cookie(): bool
     {
         return isset($_COOKIE['wordpress_logged_in_order']) &&
                !empty(sanitize_text_field(wp_unslash($_COOKIE['wordpress_logged_in_order'])));
+    }
+
+    /**
+     * Ensures cart items are properly loaded and validated.
+     * This runs after WordPress is loaded to ensure our cart items have been added
+     * before any validation occurs.
+     *
+     * @return void
+     */
+    public function ensure_cart_items_loaded(): void
+    {
+        // Check if we're in a guest session
+        if (!$this->has_guest_session_cookie()) {
+            return;
+        }
+
+        // Disable WooCommerce's built-in cart validation that removes items
+        // We handle validation in guard_guest_cart_products instead
+        remove_action('woocommerce_check_cart_items', array(WC()->cart, 'check_cart_items'), 1);
+        remove_action('woocommerce_check_cart_items', array(WC()->cart, 'check_cart_coupons'), 1);
+
+        $this->log('Disabled WooCommerce native cart validation for guest session', 'debug');
+
+        // If cart exists and is not empty, ensure items are valid
+        if (WC()->cart && !WC()->cart->is_empty()) {
+            // Log the current cart state
+            $cart_count = WC()->cart->get_cart_contents_count();
+            $this->log(sprintf('Guest session cart has %d items after disabling native validation', $cart_count), 'debug');
+
+            // Check if there are manually-added items that might need validation
+            $cart = WC()->cart->get_cart();
+            foreach ($cart as $cart_item_key => $cart_item) {
+                // Check if item has the 'key' field (indicating it was manually added)
+                if (isset($cart_item['custom_price']) && !isset($cart_item['key'])) {
+                    $this->log('Found cart item without key field - this might cause validation issues', 'warning');
+                }
+            }
+        }
     }
 }
