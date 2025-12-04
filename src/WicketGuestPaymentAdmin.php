@@ -167,6 +167,16 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             return;
         }
 
+        // Check if the order is already paid/completed - guest payment links cannot be generated for these
+        $paid_statuses = ['completed', 'processing', 'refunded'];
+        if (in_array($order->get_status(), $paid_statuses, true)) {
+            echo '<div class="notice notice-info inline" style="margin: 0; padding: 10px;">';
+            echo '<p>' . esc_html__('This order has already been paid and completed. Payment links cannot be generated for orders with completed, processing, or refunded status.', 'wicket-wgc') . '</p>';
+            echo '</div>';
+
+            return;
+        }
+
         $order_id = $order->get_id();
 
         // Add nonce for all actions within this meta box
