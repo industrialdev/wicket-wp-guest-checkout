@@ -37,6 +37,16 @@ Wicket Guest Checkout allows WordPress administrators to generate secure payment
 - Email receipt delivery
 - PDF invoice integration support
 
+## Documentation
+
+For complete documentation, including configuration examples, integration guides, and troubleshooting, see the **[Documentation Index](docs/index.md)**.
+
+### Quick Links
+- **[📚 Documentation Index](docs/index.md)** - Complete documentation with guides and references
+- **[⚙️ Configuration Quick Reference](docs/configuration-quick-reference.md)** - All configuration options
+- **[📧 Email Integration](docs/email-integration.md)** - Configure automatic email links
+- **[📄 PDF Integration](docs/pdf-integration.md)** - Configure automatic PDF links
+
 ## Requirements
 
 - **WordPress**: 6.0+
@@ -68,42 +78,48 @@ Then activate the plugin through WordPress admin.
 
 The plugin works out of the box with WooCommerce. No additional configuration required.
 
-### Encryption Keys (Recommended)
+### Email & PDF Integration (Optional)
 
-For enhanced security, add custom encryption keys to `wp-config.php`:
+For automatic guest payment links in emails and PDFs, see:
+- **[📧 Email Integration Guide](docs/email-integration.md)** - Configure automatic email links
+- **[📄 PDF Integration Guide](docs/pdf-integration.md)** - Configure automatic PDF links
 
+**Quick Enable:**
 ```php
+// Enable email integration
+add_filter('wicket/wooguestpay/email_integration_enabled', '__return_true');
+
+// Enable PDF integration
+add_filter('wicket/wooguestpay/pdf_integration_enabled', '__return_true');
+```
+
+### Advanced Configuration
+
+For comprehensive configuration options, filters, and examples, see the **[Configuration Quick Reference](docs/configuration-quick-reference.md)**.
+
+**Key Configuration Examples:**
+```php
+// Custom encryption keys (enhanced security)
 define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'your-unique-32-char-key-here');
-define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
-```
 
-If not defined, the plugin uses WordPress `SECURE_AUTH_KEY` and `AUTH_KEY` as fallback.
-
-### Token Expiry
-
-Modify token expiry time using the core class:
-
-```php
-add_action('init', function() {
-    $core = new Wicket_Guest_Payment_Core();
-    $core->set_token_expiry_days(14); // 14 days instead of default 7
+// Custom token expiry (7 days default)
+add_filter('wicket/wooguestpay/token_expiry_days', function($days) {
+    return 14; // 14 days
 });
+
+// Conditional email integration (orders over $100 only)
+add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
+    return $order && $order->get_total() > 100;
+}, 10, 2);
 ```
 
-### Allowed Order Statuses
+### Default Configuration
 
-Filter which order statuses can use guest payment:
-
-```php
-add_filter('wicket_guest_payment_allowed_order_statuses', function($statuses) {
-    $statuses[] = 'custom-status';
-    return $statuses;
-});
-```
-
-Default allowed statuses: `pending`, `failed`, `on-hold`
-
-For subscriptions, `active` status is also allowed by default.
+- **Order Statuses Allowed:** `pending`, `failed`, `on-hold`
+- **Token Expiry:** 7 days (configurable)
+- **Rate Limiting:** 5 attempts per 15 minutes per IP
+- **Email Integration:** Disabled by default
+- **PDF Integration:** Disabled by default
 
 ## Usage
 

@@ -37,8 +37,9 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
         if (!$order) {
             return false;
         }
+
         // Use stored guest email if available, fallback to billing email
-        $guest_email = $order->get_meta('_wgp_guest_email');
+        $guest_email = $order->get_meta('_wgp_guest_payment_email');
         if (!$guest_email) {
             $guest_email = $order->get_billing_email();
         }
@@ -63,6 +64,87 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
     }
 
     /**
+     * Get valid token data for an order.
+     *
+     * @param int $order_id Order ID.
+     * @param WC_Order $order Order object.
+     * @return array|null Token data or null if invalid.
+     */
+    private function get_valid_token_data(int $order_id, WC_Order $order): ?array
+    {
+        // Check if there's already a token stored
+        $token_hash = $order->get_meta('_wgp_guest_payment_token_hash', true);
+        $user_id = (int) $order->get_meta('_wgp_guest_payment_user_id', true);
+        $created = (int) $order->get_meta('_wgp_guest_payment_token_created', true);
+
+        if (empty($token_hash) || empty($user_id) || empty($created)) {
+            return null;
+        }
+
+        // Check if token has expired (default 7 days)
+        $expiry_days = apply_filters('wicket/wooguestpay/token_expiry_days', 7);
+        $expiry_timestamp = $created + ($expiry_days * DAY_IN_SECONDS);
+
+        if (current_time('timestamp') > $expiry_timestamp) {
+            return null;
+        }
+
+        // Get the Core component to validate token
+        $main_plugin = WicketGuestPayment::get_instance();
+        $core = $main_plugin->get_core();
+
+        if (!$core) {
+            return null;
+        }
+
+        // Try to decrypt and validate the token
+        $validation_result = $core->validate_guest_payment_token('', $order);
+
+        if ($validation_result === 'valid') {
+            return [
+                'token_hash' => $token_hash,
+                'user_id' => $user_id,
+                'created' => $created,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Generate a new token for an order.
+     *
+     * @param int $order_id Order ID.
+     * @param string $guest_email Guest email address.
+     * @param string $generation_method Generation method ('auto', 'manual', 'email').
+     * @return string|false Token or false on failure.
+     */
+    private function generate_token_for_order(int $order_id, string $guest_email, string $generation_method = 'auto')
+    {
+        // Get the main plugin instance to generate token
+        $main_plugin = WicketGuestPayment::get_instance();
+
+        // Generate guest payment without sending email (since this is for email integration)
+        $result = $main_plugin->initiate_guest_payment($order_id, $guest_email, false);
+
+        if ($result && !empty($result['token'])) {
+            // Add order note about automatic generation for email
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $order->add_order_note(
+                    sprintf(
+                        __('Guest payment link automatically generated for email integration.', 'wicket-wgc')
+                    )
+                );
+            }
+
+            return $result['token'];
+        }
+
+        return false;
+    }
+
+    /**
      * Append guest payment link/message to WooCommerce emails for pending orders.
      *
      * @param WC_Order $order
@@ -81,6 +163,11 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
     public function insert_guest_payment_link_email($order, $sent_to_admin, $plain_text, $email)
     {
         if (!($order instanceof WC_Order)) {
+            return;
+        }
+
+        // Check if email integration is enabled (default: false - requires explicit activation)
+        if (!apply_filters('wicket/wooguestpay/email_integration_enabled', false)) {
             return;
         }
 
@@ -121,6 +208,11 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
      */
     public function append_guest_payment_link_to_pdf($document, $order)
     {
+        // Check if PDF integration is enabled (default: false - requires explicit activation)
+        if (!apply_filters('wicket/wooguestpay/pdf_integration_enabled', false)) {
+            return;
+        }
+
         // PDF plugin passes ($document, $order) or ($order, $document) depending on version, so normalize:
         if ($order instanceof WC_Order) {
             $order_obj = $order;

@@ -70,6 +70,13 @@ class WicketGuestPayment
     private $core;
 
     /**
+     * Configuration class instance.
+     *
+     * @var WicketGuestPaymentConfig|null
+     */
+    private $config;
+
+    /**
      * Email functionality class instance.
      *
      * @var WicketGuestPaymentEmail|null
@@ -201,6 +208,10 @@ class WicketGuestPayment
         // Initialize core functionality
         $this->core = new WicketGuestPaymentCore();
         $this->core->init();
+
+        // Initialize configuration
+        $this->config = new WicketGuestPaymentConfig();
+        $this->config->init();
 
         // Initialize email functionality
         $this->email = new WicketGuestPaymentEmail($this->core);
@@ -342,6 +353,16 @@ class WicketGuestPayment
     public function get_core()
     {
         return $this->core;
+    }
+
+    /**
+     * Get the config class.
+     *
+     * @return WicketGuestPaymentConfig|null
+     */
+    public function get_config()
+    {
+        return $this->config;
     }
 
     /**
