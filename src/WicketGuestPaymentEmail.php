@@ -40,7 +40,38 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
      */
     public function init(): void
     {
-        // Nothing needed at initialization
+        // Add filter to email headers
+        add_filter('woocommerce_email_headers', [$this, 'add_cc_to_emails'], 10, 3);
+    }
+
+    /**
+     * Adds CC to the customer completed/processing order emails if guest email is present.
+     *
+     * @param string $header Email headers.
+     * @param string $email_id Email ID.
+     * @param WC_Order $order Order object.
+     * @return string Modified headers.
+     */
+    public function add_cc_to_emails($header, $email_id, $order)
+    {
+        // Only target specific emails
+        if (!in_array($email_id, ['customer_completed_order', 'customer_processing_order'])) {
+            return $header;
+        }
+
+        if (!$order) {
+            return $header;
+        }
+
+        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
+
+        // If we have a guest email, add it as CC
+        if ($guest_email && is_email($guest_email)) {
+            $header .= 'Cc: ' . $guest_email . "\r\n";
+            $this->log(sprintf('Added CC: %s to email %s for Order ID %d', $guest_email, $email_id, $order->get_id()));
+        }
+
+        return $header;
     }
 
     /**

@@ -96,8 +96,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     public function force_reuse_guest_payment_order($order_id, $checkout): int
     {
         // DIAGNOSTIC: Log that the hook was called
-        $wc_session_order = WC()->session ? WC()->session->get('order_awaiting_payment') : 'session_not_available';
-        $this->log(sprintf('force_reuse_guest_payment_order hook called. Input order_id: %s, WC session order_awaiting_payment: %s', $order_id ?? 'null', $wc_session_order ?? 'not_set'));
+        //$wc_session_order = WC()->session ? WC()->session->get('order_awaiting_payment') : 'session_not_available';
+        //$this->log(sprintf('force_reuse_guest_payment_order hook called. Input order_id: %s, WC session order_awaiting_payment: %s', $order_id ?? 'null', $wc_session_order ?? 'not_set'));
 
         // Check if this is a guest payment session
         if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
@@ -192,14 +192,16 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         // Check WooCommerce session for order_awaiting_payment
         $session_order_id = WC()->session ? WC()->session->get('order_awaiting_payment') : null;
 
-        $this->log(
-            sprintf(
-                'HARD STOPPER: Validating checkout - Expected order: %d, Session order: %s, User: %d',
-                $expected_order_id,
-                $session_order_id ?? 'NOT SET',
-                $user_id
-            )
-        );
+        $session_order_id = WC()->session ? WC()->session->get('order_awaiting_payment') : null;
+
+        //$this->log(
+        //    sprintf(
+        //        'HARD STOPPER: Validating checkout - Expected order: %d, Session order: %s, User: %d',
+        //        $expected_order_id,
+        //        $session_order_id ?? 'NOT SET',
+        //        $user_id
+        //    )
+        //);
 
         // Validate that session order matches expected order
         if (!$session_order_id || (int) $session_order_id !== (int) $expected_order_id) {
@@ -254,13 +256,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // All validations passed
-        $this->log(
-            sprintf(
-                'HARD STOPPER: Validation passed. Order #%d is correct for user %d. Allowing checkout to proceed.',
-                $expected_order_id,
-                $user_id
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'HARD STOPPER: Validation passed. Order #%d is correct for user %d. Allowing checkout to proceed.',
+        //        $expected_order_id,
+        //        $user_id
+        //    )
+        //);
     }
 
     /**
@@ -349,13 +351,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // All validations passed
-        $this->log(
-            sprintf(
-                'HARD STOPPER (Block): Validation passed. Order #%d is correct for user %d. Allowing checkout to proceed.',
-                $expected_order_id,
-                $user_id
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'HARD STOPPER (Block): Validation passed. Order #%d is correct for user %d. Allowing checkout to proceed.',
+        //        $expected_order_id,
+        //        $user_id
+        //    )
+        //);
     }
 
     /**
@@ -372,7 +374,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 'httponly' => true,
             ]);
 
-            $this->log('Cleared guest session flag cookie on logout.');
+            //$this->log('Cleared guest session flag cookie on logout.');
         }
     }
 
@@ -395,9 +397,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             $cart_data_transient_key = 'wgp_cart_' . $secure_cart_key;
             $cart_data = get_transient($cart_data_transient_key);
 
-            $this->log(
-                sprintf('Attempting to restore cart from transient: %s (Secure Key: %s)', $cart_data_transient_key, $secure_cart_key)
-            );
+            //$this->log(
+            //    sprintf('Attempting to restore cart from transient: %s (Secure Key: %s)', $cart_data_transient_key, $secure_cart_key)
+            //);
 
             // If we have cart data in the transient, restore it
             if ($cart_data && is_array($cart_data)) {
@@ -429,10 +431,12 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                         $cart[$cart_item_key] = $item_data;
                                         $cart[$cart_item_key]['data'] = $_product;
                                         WC()->cart->set_cart_contents($cart);
-                                        $this->log(sprintf('Manually added product ID %d (Variation ID: %d) to cart during transient restore with custom price.', $product_id, $variation_id));
+
+                                        //$this->log(sprintf('Manually added product ID %d (Variation ID: %d) to cart during transient restore with custom price.', $product_id, $variation_id));
                                     } else {
                                         // Add to cart directly to let WooCommerce handle creating the cart item data structure
                                         $cart_item_key = WC()->cart->add_to_cart($product_id, $quantity, $variation_id, $item_data['variation'] ?? [], $item_data);
+
                                         if (!$cart_item_key) {
                                             $this->log(sprintf('Failed to add product ID %d (Variation ID: %d) to cart during transient restore.', $product_id, $variation_id), 'warning');
                                         }
@@ -446,9 +450,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                         if (!WC()->cart->is_empty()) {
                             WC()->cart->calculate_totals(); // This is where the error was occurring
 
-                            $this->log(
-                                sprintf('Successfully restored and recalculated cart from transient. Secure key: %s', $secure_cart_key)
-                            );
+                            //$this->log(
+                            //    sprintf('Successfully restored and recalculated cart from transient. Secure key: %s', $secure_cart_key)
+                            //);
+
+                            // NOW set order_awaiting_payment to reuse the original order
 
                             // NOW set order_awaiting_payment to reuse the original order
                             $user_id = get_current_user_id();
@@ -538,8 +544,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Check if there's a guest payment token in the URL and user is not logged in
         if (isset($_GET['guest_payment_token']) && !is_user_logged_in()) {
-            $this->log('=== GUEST PAYMENT TOKEN FLOW START ===');
-            $this->log(sprintf('Request URI: %s', $_SERVER['REQUEST_URI'] ?? 'unknown'));
+            //$this->log('=== GUEST PAYMENT TOKEN FLOW START ===');
+            //$this->log(sprintf('Request URI: %s', $_SERVER['REQUEST_URI'] ?? 'unknown'));
 
             // Ensure WooCommerce is fully initialized before proceeding
             if (function_exists('WC')) {
@@ -559,7 +565,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
             $token = sanitize_text_field($_GET['guest_payment_token']);
 
-            $this->log('Guest payment token found in URL. Attempting validation.');
+            //$this->log('Guest payment token found in URL. Attempting validation.');
 
             // Rate Limiting Logic
             $ip_address = $this->get_user_ip_address();
@@ -577,7 +583,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 }
             } else {
                 // Log that rate limiting is skipped for local IP range
-                $this->log('Skipping rate limit check for local IP range (172.18.*.*): ' . $ip_address);
+                //$this->log('Skipping rate limit check for local IP range (172.18.*.*): ' . $ip_address);
                 $transient_key = null; // Ensure transient key is null if skipped
                 $failed_attempts = 0;  // Ensure failed attempts is 0 if skipped
             }
@@ -587,9 +593,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
             if ($order instanceof WC_Order) {
                 // Log the found order status
-                $this->log(
-                    sprintf('Token validated for Order ID: %d with Status: %s.', $order->get_id(), $order->get_status())
-                );
+                //$this->log(
+                //    sprintf('Token validated for Order ID: %d with Status: %s.', $order->get_id(), $order->get_status())
+                //);
 
                 // Check if token is expired (using core method), passing the existing order object
                 $token_data = $this->core->get_valid_token_data($order->get_id(), $order);
@@ -607,7 +613,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 // User Authentication
                 $user_id = $order->get_user_id();
                 if ($user_id && get_user_by('id', $user_id)) {
-                    $this->log('Attempting to authenticate user ID: ' . $user_id . ' via token for order #' . $order->get_id() . '.');
+                    //$this->log('Attempting to authenticate user ID: ' . $user_id . ' via token for order #' . $order->get_id() . '.');
 
                     // Token is for a specific order - use ONLY that order
                     // DO NOT redirect to other unpaid orders
@@ -628,9 +634,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     setcookie(self::GUEST_SESSION_COOKIE, '1', time() + HOUR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
                     // Ensure no WC session variable is set here for guest state tracking
 
-                    $this->log(
-                        sprintf('User ID: %d authenticated successfully via token. Original Order ID: %d stored. Guest session flag cookie set.', $user_id, $order->get_id())
-                    );
+                    //$this->log(
+                    //    sprintf('User ID: %d authenticated successfully via token. Original Order ID: %d stored. Guest session flag cookie set.', $user_id, $order->get_id())
+                    //);
 
                     // Clear the rate limit transient on success only if rate limiting was active
                     if (!str_starts_with($ip_address, '172.18.') && $transient_key) {
@@ -640,14 +646,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     // Check WC cart state before preparation
                     $cart_items_before = WC()->cart ? count(WC()->cart->get_cart()) : 0;
                     $order_items = $order->get_items() ? count($order->get_items()) : 0;
-                    $this->log(
-                        sprintf(
-                            'Before cart preparation: Cart has %d items, Order has %d items (Order ID: %d)',
-                            $cart_items_before,
-                            $order_items,
-                            $order->get_id()
-                        )
-                    );
+                    //$this->log(
+                    //    sprintf(
+                    //        'Before cart preparation: Cart has %d items, Order has %d items (Order ID: %d)',
+                    //        $cart_items_before,
+                    //        $order_items,
+                    //        $order->get_id()
+                    //    )
+                    //);
 
                     // Ensure WooCommerce is fully initialized
                     if (function_exists('WC') && isset(WC()->cart) && isset(WC()->session)) {
@@ -675,27 +681,30 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                             // Set order_awaiting_payment in session so checkout validation passes
                             // This is needed for the validate_guest_payment_order_before_checkout() check
                             WC()->session->set('order_awaiting_payment', $order->get_id());
-                            $this->log(
-                                sprintf(
-                                    'Order #%d prepared for checkout. Cart hash synced to %s. Set order_awaiting_payment to %d.',
-                                    $order->get_id(),
-                                    $cart_hash,
-                                    $order->get_id()
-                                )
-                            );
+                            //$this->log(
+                            //    sprintf(
+                            //        'Order #%d prepared for checkout. Cart hash synced to %s. Set order_awaiting_payment to %d.',
+                            //        $order->get_id(),
+                            //        $cart_hash,
+                            //        $order->get_id()
+                            //    )
+                            //);
                         }
 
                         // CRITICAL: Save session data
                         WC()->session->save_data();
 
-                        $this->log(
-                            sprintf(
-                                'After cart preparation: Cart has %d items, Preparation result: %s (Order ID: %d)',
-                                WC()->cart->get_cart_contents_count(),
-                                ($cart_prepared ? 'SUCCESS' : 'FAILED'),
-                                $order->get_id()
-                            )
-                        );
+                        // CRITICAL: Save session data
+                        WC()->session->save_data();
+
+                        //$this->log(
+                        //    sprintf(
+                        //        'After cart preparation: Cart has %d items, Preparation result: %s (Order ID: %d)',
+                        //        WC()->cart->get_cart_contents_count(),
+                        //        ($cart_prepared ? 'SUCCESS' : 'FAILED'),
+                        //        $order->get_id()
+                        //    )
+                        //);
 
                         if ($cart_prepared) {
                             // Double-check cart is not empty before redirecting
@@ -723,13 +732,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                 }
 
                                 // Cart prepared successfully, redirect to cart page
-                                $this->log(
-                                    sprintf(
-                                        'Cart prepared successfully with %d items for Order ID: %d. Redirecting to cart.',
-                                        WC()->cart->get_cart_contents_count(),
-                                        $order->get_id()
-                                    )
-                                );
+                                //$this->log(
+                                //    sprintf(
+                                //        'Cart prepared successfully with %d items for Order ID: %d. Redirecting to cart.',
+                                //        WC()->cart->get_cart_contents_count(),
+                                //        $order->get_id()
+                                //    )
+                                //);
 
                                 // Add cart contents to the transient to ensure it's available after redirect
                                 $customer_id = get_current_user_id(); // Re-confirm we have the user ID
@@ -741,7 +750,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                     set_transient($transient_key, WC()->cart->get_cart_for_session(), DAY_IN_SECONDS); // Increase expiry to 1 day
 
                                     $redirect_url = add_query_arg('wgp_cart_key', $secure_key, wc_get_cart_url());
-                                    $this->log(sprintf('=== REDIRECTING TO: %s ===', $redirect_url));
+                                    //$this->log(sprintf('=== REDIRECTING TO: %s ===', $redirect_url));
 
                                     // Redirect to cart with the secure key
                                     wp_safe_redirect($redirect_url);
@@ -838,7 +847,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $is_guest_session = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
 
         if ($is_guest_session) {
-            $this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
+            //$this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
 
             // Add Logging for Conditional Tags
             $log_is_checkout = is_checkout() ? 'true' : 'false';
@@ -846,9 +855,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             $log_is_order_pay = is_wc_endpoint_url('order-pay') ? 'true' : 'false';
             $log_is_ajax = wp_doing_ajax() ? 'true' : 'false'; // Add AJAX check log
             $log_is_rest = (defined('REST_REQUEST') && REST_REQUEST) ? 'true' : 'false'; // Add REST check log
-            $this->log(
-                sprintf('Restriction check - Conditional Tags: is_checkout=[%s], is_cart=[%s], is_order_pay=[%s], is_ajax=[%s], is_rest=[%s]', $log_is_checkout, $log_is_cart, $log_is_order_pay, $log_is_ajax, $log_is_rest)
-            );
+            $log_is_order_pay = is_wc_endpoint_url('order-pay') ? 'true' : 'false';
+            $log_is_ajax = wp_doing_ajax() ? 'true' : 'false'; // Add AJAX check log
+            $log_is_rest = (defined('REST_REQUEST') && REST_REQUEST) ? 'true' : 'false'; // Add REST check log
+            //$this->log(
+            //    sprintf('Restriction check - Conditional Tags: is_checkout=[%s], is_cart=[%s], is_order_pay=[%s], is_ajax=[%s], is_rest=[%s]', $log_is_checkout, $log_is_cart, $log_is_order_pay, $log_is_ajax, $log_is_rest)
+            //);
+            // End Logging
             // End Logging
 
             // Allow access only to checkout, order-pay endpoint, cart, AJAX requests, OR REST API requests
@@ -864,8 +877,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 // Redirect to cart
                 wp_safe_redirect(wc_get_cart_url());
                 exit;
+                wp_safe_redirect(wc_get_cart_url());
+                exit;
             } else {
-                $this->log('Access allowed for guest session on current page (URL: ' . (isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A') . ').');
+                //$this->log('Access allowed for guest session on current page (URL: ' . (isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A') . ').');
             }
         }
     }
@@ -895,9 +910,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 if ($new_order && $new_order->get_user_id() == $current_user_id) {
                     $this->core->invalidate_token_for_order((int) $original_order_id_to_invalidate);
 
-                    $this->log(
-                        sprintf('Order verified cleanup: Invalidated token for original Order ID: %d (New Order ID was %d).', $original_order_id_to_invalidate, $order_id)
-                    );
+                    //$this->log(
+                    //    sprintf('Order verified cleanup: Invalidated token for original Order ID: %d (New Order ID was %d).', $original_order_id_to_invalidate, $order_id)
+                    //);
                 } else {
                     $this->log(
                         sprintf('DUPLICATE PREVENTION: Skipping cleanup for order #%d - order verification failed for user %d.', $order_id, $current_user_id),
@@ -919,9 +934,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 $order->add_order_note(__('Guest payment completed using token link. User logged out.', 'wicket-wgc'));
                 $order->save();
 
-                $this->log(
-                    sprintf('Guest payment cleanup: Session ended for Order ID: %d.', $order_id)
-                );
+                //$this->log(
+                //    sprintf('Guest payment cleanup: Session ended for Order ID: %d.', $order_id)
+                //);
             }
 
             // Get user ID before clearing auth cookie, needed for user meta cleanup
@@ -930,6 +945,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             // Immediate Logout and Cleanup
             // Clear the WordPress auth cookie immediately server-side
             wp_clear_auth_cookie();
+            wp_set_current_user(0); // Ensure global state reflects logout immediately
 
             // Clear the guest session flag cookie immediately server-side
             setcookie(self::GUEST_SESSION_COOKIE, '', [
@@ -967,11 +983,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     }
                 }
 
-                $this->log(sprintf('Cleared user meta and %d cart transients for user ID: %d', $cleanup_count, $user_id));
+                //$this->log(sprintf('Cleared user meta and %d cart transients for user ID: %d', $cleanup_count, $user_id));
             }
 
             // Log the immediate logout action
-            $this->log('Immediate logout: Auth and guest cookies cleared for Order ID: ' . $order_id);
+            //$this->log('Immediate logout: Auth and guest cookies cleared for Order ID: ' . $order_id);
         }
     }
 
@@ -1047,7 +1063,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             switch ($success_code) {
                 case '1':
                     $message = __('Your payment has already been completed. Thank you!', 'wicket-wgc');
-                    $this->log('Displaying success: payment_already_completed');
+                    //$this->log('Displaying success: payment_already_completed');
                     break;
             }
             if ($message && function_exists('wc_add_notice')) {
@@ -1105,7 +1121,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // If the guest session cookie is set, remove the theme's filter and hide the admin bar
         if ($cookie_set) {
-            $this->log('maybe_hide_admin_bar: Guest cookie is set. Removing theme filter wicket_should_show_admin_bar and hiding admin bar.');
+            //$this->log('maybe_hide_admin_bar: Guest cookie is set. Removing theme filter wicket_should_show_admin_bar and hiding admin bar.');
             remove_filter('show_admin_bar', 'wicket_should_show_admin_bar', PHP_INT_MAX);
 
             return false;

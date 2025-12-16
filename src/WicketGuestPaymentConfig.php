@@ -115,7 +115,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         return $default_days;
     }
 
-    
+
     /**
      * Get boolean value from WordPress option.
      *

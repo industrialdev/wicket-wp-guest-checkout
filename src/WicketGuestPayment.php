@@ -180,7 +180,7 @@ class WicketGuestPayment
         $this->register_product_filters();
 
         // Log successful initialization
-        $this->log('Guest Payment plugin initialized successfully', 'info');
+        //$this->log('Guest Payment plugin initialized successfully', 'info');
     }
 
     /**

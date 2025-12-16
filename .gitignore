@@ -40,3 +40,4 @@ tmp/
 *.swp
 *~
 .php-cs-fixer.cache
+.php-cs-fixer.cache

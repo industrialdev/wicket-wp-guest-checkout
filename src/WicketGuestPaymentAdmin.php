@@ -215,10 +215,14 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
 			<?php
                 if ($generation_method === 'manual') {
                     // Message for manually generated links
-                    printf(
-                        '<p>' . esc_html__('A valid payment link (generated manually) exists for %s.', 'wicket-wgc') . '</p>',
-                        '<strong>' . esc_html($token_data['guest_email']) . '</strong>'
-                    );
+                    if (empty($token_data['guest_email'])) {
+                        echo '<p>' . esc_html__('A valid payment link (generated manually) exists.', 'wicket-wgc') . '</p>';
+                    } else {
+                        printf(
+                            '<p>' . esc_html__('A valid payment link (generated manually) exists for %s.', 'wicket-wgc') . '</p>',
+                            '<strong>' . esc_html($token_data['guest_email']) . '</strong>'
+                        );
+                    }
                 } else {
                     // Message for links sent via email (original message)
                     printf(
@@ -477,11 +481,9 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             wp_send_json_error(['message' => __('This order must be assigned to a customer before generating a guest payment link. Please assign a customer to this order and try again.', 'wicket-wgc')]);
         }
 
-        // Try order meta, then billing email, then fallback to admin email
-        $guest_email = $order ? $order->get_meta('_wgp_guest_payment_email', true) ?: $order->get_billing_email() : null;
-        if (empty($guest_email)) {
-            $guest_email = get_option('admin_email');
-        }
+        // For manual link generation, we explicitly want NO guest email associated
+        // so that the user is prompted on the Thank You page.
+        $guest_email = '';
 
         // Generate the token (this also invalidates previous ones)
         $token = $this->core->generate_token_for_order($order_id, $guest_email, 'manual'); // Specify manual generation

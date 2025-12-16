@@ -209,7 +209,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         if (!isset(WC()->cart) || !isset(WC()->session)) {
             // This ensures WC is fully initialized
 
-            $this->log('Initializing WooCommerce session and cart');
+            //$this->log('Initializing WooCommerce session and cart');
 
             // Make sure WooCommerce is fully loaded
             WC()->initialize_session();
@@ -245,9 +245,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // Log the order items for debugging
 
-        $this->log(
-            sprintf('Preparing cart for Order ID: %d with %d items', $order->get_id(), $item_count)
-        );
+        //$this->log(
+        //    sprintf('Preparing cart for Order ID: %d with %d items', $order->get_id(), $item_count)
+        //);
 
         // Check if order has any items at all
         if ($item_count === 0) {
@@ -266,9 +266,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             // Ensure we are only processing product line items
             if (!is_a($item, 'WC_Order_Item_Product')) {
 
-                $this->log(
-                    sprintf('Skipping non-product item in Order ID: %d, Item ID: %d', $order->get_id(), $item_id)
-                );
+                //$this->log(
+                //    sprintf('Skipping non-product item in Order ID: %d, Item ID: %d', $order->get_id(), $item_id)
+                //);
 
                 continue; // Skip fees, shipping, etc.
             }
@@ -278,16 +278,16 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             $variation_id = $item->get_variation_id();
 
             // Log raw order item data for debugging variable product issues
-            $this->log(
-                sprintf(
-                    'Order item %d: product_id=%d, variation_id=%d, type=%s',
-                    $item_id,
-                    $product_id,
-                    $variation_id,
-                    $item->get_type()
-                ),
-                'debug'
-            );
+            //$this->log(
+            //    sprintf(
+            //        'Order item %d: product_id=%d, variation_id=%d, type=%s',
+            //        $item_id,
+            //        $product_id,
+            //        $variation_id,
+            //        $item->get_type()
+            //    ),
+            //    'debug'
+            //);
 
             // Determine which product to use (variation or parent)
             $target_product_id = $variation_id > 0 ? $variation_id : $product_id;
@@ -315,26 +315,25 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             }
 
             // Log product details
-            $this->log(
-                sprintf(
-                    'Product details - ID: %d, Type: %s, Purchasable: %s, Stock Status: %s',
-                    $product_id,
-                    $product->get_type(),
-                    $product->is_purchasable() ? 'Yes' : 'No',
-                    $product->get_stock_status()
-                ),
-                'debug'
-            );
+            //$this->log(
+            //    sprintf(
+            //        'Product details - ID: %d, Type: %s, Purchasable: %s, Stock Status: %s',
+            //        $product_id,
+            //        $product->get_type(),
+            //        $product->is_purchasable() ? 'Yes' : 'No',
+            //        $product->get_stock_status()
+            //    ),
+            //    'debug'
+            //);
 
             try {
                 // Log the attempt to add to cart
 
-                $this->log(
-                    sprintf('Adding product %d (variation: %d, quantity: %d) to cart for Order ID: %d', $product_id, $variation_id, $quantity, $order->get_id())
-                );
+                //$this->log(
+                //    sprintf('Adding product %d (variation: %d, quantity: %d) to cart for Order ID: %d', $product_id, $variation_id, $quantity, $order->get_id())
+                //);
 
-                // Use a more direct approach to add to cart
-                $cart_item_data = [];
+                // Use a more direct approach to add to cart                $cart_item_data = [];
                 $variation_attributes = [];
 
                 // For subscriptions or other complex products, try to get data from the order item
@@ -377,11 +376,10 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         WC()->cart->set_cart_contents($cart);
                     }
 
-                    $this->log(
-                        sprintf('Successfully added product %d to cart with key %s', $product_id, $cart_item_key)
-                    );
-                } else {
-                    // Try an alternative approach if the first one fails
+                    //$this->log(
+                    //    sprintf('Successfully added product %d to cart with key %s', $product_id, $cart_item_key)
+                    //);
+                } else {                    // Try an alternative approach if the first one fails
 
                     $this->log(
                         sprintf('First attempt to add product %d failed, trying alternative approach', $product_id),
@@ -430,7 +428,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         $cart_item_data['_subscription_period'] = 'month'; // Default period - should match product settings
                         $cart_item_data['_subscription_period_interval'] = 1; // Default interval
                         $cart_item_data['_subscription_length'] = 0; // No fixed length
-                        $this->log('Added WooCommerce Subscriptions-specific data to cart item', 'debug');
+                        //$this->log('Added WooCommerce Subscriptions-specific data to cart item', 'debug');
                     }
 
                     $cart[$cart_item_key] = $cart_item_data;
@@ -464,9 +462,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             WC()->session->set('cart', WC()->cart->get_cart_for_session());
             WC()->session->save_data(); // Ensure session is saved after all items + calc.
 
-            $this->log(
-                sprintf('Cart preparation completed for Order ID: %d. Final cart count: %d', $order->get_id(), WC()->cart->get_cart_contents_count())
-            );
+            //$this->log(
+            //    sprintf('Cart preparation completed for Order ID: %d. Final cart count: %d', $order->get_id(), WC()->cart->get_cart_contents_count())
+            //);
         }
 
         return $items_added;
@@ -483,9 +481,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             $random_bytes = random_bytes(32);
             $token = bin2hex($random_bytes);
 
-            $this->log(
-                sprintf('Successfully generated secure payment token of length %d.', strlen($token))
-            );
+            //$this->log(
+            //    sprintf('Successfully generated secure payment token of length %d.', strlen($token))
+            //);
 
             return $token;
         } catch (Exception $e) {
@@ -525,14 +523,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         // Log order type for debugging
-        $this->log(
-            sprintf(
-                'Order type for ID %d: %s (Class: %s)',
-                $order_id,
-                $order->get_type(),
-                get_class($order)
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'Order type for ID %d: %s (Class: %s)',
+        //        $order_id,
+        //        $order->get_type(),
+        //        get_class($order)
+        //    )
+        //);
         if (empty($token)) {
             $this->log(sprintf('Empty token provided for Order ID: %d', $order_id), 'error');
 
@@ -543,7 +541,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
             return false;
         }
-        if (!is_email($guest_email)) {
+        if (!empty($guest_email) && !is_email($guest_email)) {
             $this->log(sprintf('Invalid email address provided for Order ID: %d: %s', $order_id, $guest_email), 'error');
 
             return false;
@@ -613,16 +611,16 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 ? get_post_meta($order_id, '_wgp_guest_payment_token_created', true)
                 : $order->get_meta('_wgp_guest_payment_token_created');
 
-            $this->log(
-                sprintf(
-                    'Stored token data - Order ID: %d, Type: %s, Hash: %s, Encrypted: %s, Timestamp: %d',
-                    $order_id,
-                    $order->get_type(),
-                    $stored_hash,
-                    $stored_encrypted ? 'present' : 'missing',
-                    $stored_timestamp
-                )
-            );
+            //$this->log(
+            //    sprintf(
+            //        'Stored token data - Order ID: %d, Type: %s, Hash: %s, Encrypted: %s, Timestamp: %d',
+            //        $order_id,
+            //        $order->get_type(),
+            //        $stored_hash,
+            //        $stored_encrypted ? 'present' : 'missing',
+            //        $stored_timestamp
+            //    )
+            //);
 
             return true;
         } else {
@@ -654,14 +652,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $input_token_hash = hash_hmac('sha256', $token, $encryption_key);
 
         // Log token and hash for debugging
-        $this->log(
-            sprintf(
-                'Token validation - Input token: %s, Input hash: %s, WICKET_GUEST_PAYMENT_ENCRYPTION_KEY defined: %s',
-                $token,
-                $input_token_hash,
-                defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') ? 'yes' : 'no'
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'Token validation - Input token: %s, Input hash: %s, WICKET_GUEST_PAYMENT_ENCRYPTION_KEY defined: %s',
+        //        $token,
+        //        $input_token_hash,
+        //        defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') ? 'yes' : 'no'
+        //    )
+        //);
 
         // First, try to find the order or subscription with any status to provide better debugging
         $meta_query = [
@@ -679,20 +677,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             'meta_query'             => $meta_query,
             'return'                 => 'ids',
         ];
-        $this->log(
-            sprintf(
-                'Searching for subscriptions with wcs_get_subscriptions: %s',
-                json_encode($subscription_query_args)
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'Searching for subscriptions with wcs_get_subscriptions: %s',
+        //        json_encode($subscription_query_args)
+        //    )
+        //);
         $found_ids = function_exists('wcs_get_subscriptions') ? wcs_get_subscriptions($subscription_query_args) : [];
-        $this->log(
-            sprintf(
-                'wcs_get_subscriptions result for hash %s: %s',
-                $input_token_hash,
-                json_encode($found_ids)
-            )
-        );
+        //$this->log(
+        //    sprintf(
+        //        'wcs_get_subscriptions result for hash %s: %s',
+        //        $input_token_hash,
+        //        json_encode($found_ids)
+        //    )
+        //);
 
         // If a subscription was found by wcs_get_subscriptions, extract the ID from the array keys
         $is_subscription_check = false;
@@ -700,7 +698,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             $subscription_keys = array_keys($found_ids);
             if (!empty($subscription_keys)) {
                 $found_order_id = $subscription_keys[0]; // Get the first key, which is the ID
-                $this->log(sprintf('Extracted subscription ID %d from wcs_get_subscriptions result.', $found_order_id));
+                //$this->log(sprintf('Extracted subscription ID %d from wcs_get_subscriptions result.', $found_order_id));
                 // Clear the $found_ids array to prevent falling into the order logic if we already have a subscription ID
                 // We need $found_ids to be non-empty later, so we put the extracted ID into it
                 $found_ids = [$found_order_id];
@@ -718,20 +716,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 'meta_query' => $meta_query,
                 'return'     => 'ids',
             ];
-            $this->log(
-                sprintf(
-                    'Searching for orders with wc_get_orders: %s',
-                    json_encode($order_query_args)
-                )
-            );
+            //$this->log(
+            //    sprintf(
+            //        'Searching for orders with wc_get_orders: %s',
+            //        json_encode($order_query_args)
+            //    )
+            //);
             $found_ids = wc_get_orders($order_query_args);
-            $this->log(
-                sprintf(
-                    'wc_get_orders (orders only) result for hash %s: %s',
-                    $input_token_hash,
-                    json_encode($found_ids)
-                )
-            );
+            //$this->log(
+            //    sprintf(
+            //        'wc_get_orders (orders only) result for hash %s: %s',
+            //        $input_token_hash,
+            //        json_encode($found_ids)
+            //    )
+            //);
         }
 
         // Log if we found an order/subscription with any status
@@ -752,47 +750,47 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 $subscription_allowed_statuses = apply_filters('wicket_guest_payment_allowed_subscription_statuses', array_merge($allowed_statuses, ['active']));
                 // Ensure no duplicates
                 $allowed_statuses = array_unique($subscription_allowed_statuses);
-                $this->log(sprintf('Identified as subscription. Allowed statuses: %s', implode(', ', $allowed_statuses)));
+                //$this->log(sprintf('Identified as subscription. Allowed statuses: %s', implode(', ', $allowed_statuses)));
             } else {
-                $this->log(sprintf('Identified as order. Allowed statuses: %s', implode(', ', $allowed_statuses)));
+                //$this->log(sprintf('Identified as order. Allowed statuses: %s', implode(', ', $allowed_statuses)));
             }
 
-            $this->log(
-                sprintf('Found order #%d with status "%s" for token hash.', $found_order_id, $status)
-            );
+            //$this->log(
+            //    sprintf('Found order #%d with status "%s" for token hash.', $found_order_id, $status)
+            //);
 
             // Check if the found order/subscription has an allowed status
             $is_status_allowed = $found_order && $found_order->has_status($allowed_statuses);
 
-            $this->log(sprintf('Result of has_status() check: %s', $is_status_allowed ? 'true' : 'false'));
+            //$this->log(sprintf('Result of has_status() check: %s', $is_status_allowed ? 'true' : 'false'));
 
             if ($is_status_allowed) {
                 // Status is allowed, proceed with this order/subscription
-                $this->log(
-                    sprintf('Order #%d has allowed status "%s". Proceeding with validation.', $found_order_id, $status)
-                );
+                //$this->log(
+                //    sprintf('Order #%d has allowed status "%s". Proceeding with validation.', $found_order_id, $status)
+                //);
                 $order = $found_order;
                 $order_id = $found_order_id;
                 // Skip any later checks that might specifically look for 'pending' status
                 goto validate_token_details;
             } else {
                 // Status is not allowed
-                $this->log(
-                    sprintf(
-                        'Order #%d has status "%s" which is not in allowed statuses list: [%s].',
-                        $found_order_id,
-                        $status,
-                        implode(', ', $allowed_statuses)
-                    )
-                );
+                //$this->log(
+                //    sprintf(
+                //        'Order #%d has status "%s" which is not in allowed statuses list: [%s].',
+                //        $found_order_id,
+                //        $status,
+                //        implode(', ', $allowed_statuses)
+                //    )
+                //);
                 // Explicitly clear order/order_id to prevent potential issues later
                 $order = null;
                 $order_id = 0;
             }
         } else {
-            $this->log(
-                sprintf('No order found for token hash: %s', $input_token_hash)
-            );
+            //$this->log(
+            //    sprintf('No order found for token hash: %s', $input_token_hash)
+            //);
         }
 
         // If we reached here without finding a suitable order/subscription via the hash above,
@@ -1058,7 +1056,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $this->invalidate_token_for_order($order_id);
 
         $order = wc_get_order($order_id);
-        if (!$order || !is_email($guest_email)) {
+        // Allow empty email for manual generation (Thank You page capture flow)
+        if (!$order || (!empty($guest_email) && !is_email($guest_email))) {
             $this->log(
                 sprintf('Failed to generate guest token. Invalid order ID (%d) or email (%s).', $order_id, $guest_email)
             );
@@ -1142,10 +1141,11 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         // Check if essential data for usage exists
-        if (empty($guest_email) || !$user_id) {
+        // We allow empty email for manual links, but user_id is required.
+        if (!$user_id) {
             // Log this potential issue
             $this->log(
-                sprintf('Token is valid but missing email or user ID for Order ID: %d.', $order_id)
+                sprintf('Token is valid but missing user ID for Order ID: %d.', $order_id)
             );
 
             // Decide if this should be null or return partial data. Returning null seems safer.
@@ -1313,21 +1313,21 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return;
         }
 
-        $this->log('Guard: Starting cart validation for guest payment session.', 'debug');
+        //$this->log('Guard: Starting cart validation for guest payment session.', 'debug');
 
         $removed_items = false;
         $cart_contents = $cart->get_cart();
 
-        $this->log(sprintf('Guard: Found %d items in cart to validate.', count($cart_contents)), 'debug');
+        //$this->log(sprintf('Guard: Found %d items in cart to validate.', count($cart_contents)), 'debug');
 
         foreach ($cart_contents as $cart_item_key => $cart_item) {
             $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
             $variation_id = isset($cart_item['variation_id']) ? (int) $cart_item['variation_id'] : 0;
 
-            $this->log(
-                sprintf('Guard: Checking cart item %s - Product ID: %d, Variation ID: %d', $cart_item_key, $product_id, $variation_id),
-                'debug'
-            );
+            //$this->log(
+            //    sprintf('Guard: Checking cart item %s - Product ID: %d, Variation ID: %d', $cart_item_key, $product_id, $variation_id),
+            //    'debug'
+            //);
 
             // 1. Validate Product ID
             if ($product_id <= 0) {
@@ -1350,7 +1350,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
                 if ($product && $product->exists()) {
                     $cart_contents[$cart_item_key]['data'] = $product;
-                    $this->log(sprintf('Guard: Rehydrated data object for cart item %s with product %d', $cart_item_key, $target_id), 'debug');
+                    //$this->log(sprintf('Guard: Rehydrated data object for cart item %s with product %d', $cart_item_key, $target_id), 'debug');
                 } else {
                     $cart->remove_cart_item($cart_item_key);
                     $this->log(sprintf('Guard: REMOVED cart item %s: Could not load product %d', $cart_item_key, $target_id), 'error');
@@ -1388,17 +1388,17 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 // Ensure data object is the variation, not the parent
                 if ($cart_contents[$cart_item_key]['data']->get_id() !== $variation_id) {
                     $cart_contents[$cart_item_key]['data'] = $variation_product;
-                    $this->log(sprintf('Guard: Updated data object to variation %d for cart item %s', $variation_id, $cart_item_key), 'debug');
+                    //$this->log(sprintf('Guard: Updated data object to variation %d for cart item %s', $variation_id, $cart_item_key), 'debug');
                 }
             }
 
-            $this->log(sprintf('Guard: Cart item %s validated successfully.', $cart_item_key), 'debug');
+            //$this->log(sprintf('Guard: Cart item %s validated successfully.', $cart_item_key), 'debug');
         }
 
         // Persist any data updates performed above (like rehydrating 'data')
         $cart->set_cart_contents($cart_contents);
 
-        $this->log(sprintf('Guard: Validation complete. Removed items: %s', $removed_items ? 'Yes' : 'No'), 'debug');
+        //$this->log(sprintf('Guard: Validation complete. Removed items: %s', $removed_items ? 'Yes' : 'No'), 'debug');
 
         if ($removed_items) {
             wc_add_notice(__('One or more unavailable items were removed from your cart. Please review before continuing.', 'wicket-wgc'), 'error');
@@ -1457,7 +1457,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         remove_action('woocommerce_check_cart_items', [WC()->cart, 'check_cart_items'], 1);
         remove_action('woocommerce_check_cart_items', [WC()->cart, 'check_cart_coupons'], 1);
 
-        $this->log('Disabled WooCommerce native cart validation for guest session', 'debug');
+        //$this->log('Disabled WooCommerce native cart validation for guest session', 'debug');
 
         // If cart exists and is not empty, ensure items are valid
         if (WC()->cart && !WC()->cart->is_empty()) {
