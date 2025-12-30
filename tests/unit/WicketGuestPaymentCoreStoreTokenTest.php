@@ -4,53 +4,165 @@ declare(strict_types=1);
 
 namespace Wicket\GuestPayment\Tests;
 
-use Brain\Monkey\Functions;
+use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
-use Wicket\GuestPayment\Tests\AbstractTestCase;
 use WicketGuestPaymentCore;
-use Mockery;
+use Brain\Monkey;
 
 #[CoversClass(WicketGuestPaymentCore::class)]
 class WicketGuestPaymentCoreStoreTokenTest extends AbstractTestCase
 {
-    public function test_store_token_data_fails_if_order_not_found(): void
-    {
-        Functions\expect('wc_get_order')->with(123)->andReturn(false);
-        
-        $core = new WicketGuestPaymentCore();
-        $result = $core->store_token_data(123, 'token', 1, 'test@example.com', 'email');
-        
-        $this->assertFalse($result);
-    }
+    private ?WicketGuestPaymentCore $core = null;
 
-    public function test_store_token_data_successful(): void
+    protected function setUp(): void
     {
-        $order_id = 123;
-        $token = 'test-token-value';
-        $user_id = 456;
-        $guest_email = 'guest@example.com';
-        
-        $order = Mockery::mock('WC_Order');
-        $order->shouldReceive('get_id')->andReturn($order_id);
-        $order->shouldReceive('get_type')->andReturn('shop_order');
-        $order->shouldReceive('update_meta_data')->atLeast()->once();
-        $order->shouldReceive('add_order_note')->once();
-        $order->shouldReceive('save')->once()->andReturn(true);
-        $order->shouldReceive('get_meta')->andReturn('dummy');
-        
-        Functions\expect('wc_get_order')->with($order_id)->andReturn($order);
-        
-        // Mock encryption constants if not defined (they might be in bootstrap, but let's be safe)
+        parent::setUp();
+
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
             define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'test-key-32-chars-long-exactly-32');
         }
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
         }
+        if (!defined('DAY_IN_SECONDS')) {
+            define('DAY_IN_SECONDS', 86400);
+        }
 
-        $core = new WicketGuestPaymentCore();
-        $result = $core->store_token_data($order_id, $token, $user_id, $guest_email, 'email');
-        
+        $this->core = new WicketGuestPaymentCore();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->core = null;
+        parent::tearDown();
+    }
+
+    public function test_store_token_data_returns_false_when_order_not_found(): void
+    {
+        Monkey\Functions\stubs([
+            'wc_get_order' => false,
+        ]);
+
+        $result = $this->core->store_token_data(999, 'test_token', 1, 'test@example.com', 'email');
+
+        $this->assertFalse($result);
+    }
+
+    public function test_store_token_data_returns_false_for_empty_token(): void
+    {
+        $mockOrder = $this->createMockOrder();
+
+        Monkey\Functions\stubs([
+            'wc_get_order' => $mockOrder,
+            'is_email' => false,
+        ]);
+
+        $result = $this->core->store_token_data(1, '', 1, 'test@example.com', 'email');
+
+        $this->assertFalse($result);
+    }
+
+    public function test_store_token_data_returns_false_for_invalid_email(): void
+    {
+        $mockOrder = $this->createMockOrder();
+
+        Monkey\Functions\stubs([
+            'wc_get_order' => $mockOrder,
+            'is_email' => false,
+        ]);
+
+        $result = $this->core->store_token_data(1, 'valid_token', 1, 'invalid-email', 'email');
+
+        $this->assertFalse($result);
+    }
+
+    public function test_store_token_data_returns_false_for_invalid_user_id(): void
+    {
+        $mockOrder = $this->createMockOrder();
+
+        Monkey\Functions\stubs([
+            'wc_get_order' => $mockOrder,
+            'is_email' => true,
+        ]);
+
+        $result = $this->core->store_token_data(1, 'valid_token', 0, 'test@example.com', 'email');
+
+        $this->assertFalse($result);
+    }
+
+    public function test_store_token_data_succeeds_with_valid_inputs(): void
+    {
+        $mockOrder = $this->createMockOrderWithSave();
+
+        Monkey\Functions\stubs([
+            'wc_get_order' => $mockOrder,
+            'is_email' => true,
+        ]);
+
+        $result = $this->core->store_token_data(1, 'valid_token_123456789', 1, 'test@example.com', 'email');
+
         $this->assertTrue($result);
+    }
+
+    public function test_store_token_data_handles_subscription_orders(): void
+    {
+        $mockOrder = $this->createMockSubscriptionOrderWithSave();
+
+        Monkey\Functions\stubs([
+            'wc_get_order' => $mockOrder,
+            'is_email' => true,
+            'get_post_meta' => 'some_hash',
+            'update_post_meta' => true,
+        ]);
+
+        $result = $this->core->store_token_data(1, 'valid_token_123456789', 1, 'test@example.com', 'manual');
+
+        $this->assertTrue($result);
+    }
+
+    private function createMockOrder(): object
+    {
+        return new class {
+            public function get_id(): int { return 1; }
+            public function get_type(): string { return 'shop_order'; }
+            public function update_meta_data(string $key, $value): void {}
+            public function add_order_note(string $note): void {}
+            public function save(): int { return 1; }
+            public function get_meta(string $key) { return 'some_hash'; }
+        };
+    }
+
+    private function createMockOrderWithSave(): object
+    {
+        return new class {
+            public int $saveCount = 0;
+            public function get_id(): int { return 1; }
+            public function get_type(): string { return 'shop_order'; }
+            public function update_meta_data(string $key, $value): void {}
+            public function add_order_note(string $note): void {}
+            public function save(): int {
+                $this->saveCount++;
+                return 1;
+            }
+            public function get_meta(string $key) { return 'some_hash'; }
+            public function meta_exists(string $key): bool { return true; }
+        };
+    }
+
+    private function createMockSubscriptionOrderWithSave(): object
+    {
+        return new class {
+            public int $saveCount = 0;
+            public function get_id(): int { return 1; }
+            public function get_type(): string { return 'shop_subscription'; }
+            public function update_meta_data(string $key, $value): void {}
+            public function add_order_note(string $note): void {}
+            public function save(): int {
+                $this->saveCount++;
+                return 1;
+            }
+            public function get_meta(string $key) { return 'some_hash'; }
+            public function meta_exists(string $key): bool { return true; }
+        };
     }
 }
