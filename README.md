@@ -259,8 +259,88 @@ WooCommerce → Status → Logs → Select "wicket-guest-payment"
 
 ### Testing
 
+#### Running PHPUnit Tests
+
 ```bash
-# Manual testing checklist
+# Run all tests
+composer test
+
+# Run tests with coverage report
+composer test-coverage
+
+# Run specific test file
+./vendor/bin/phpunit tests/unit/WicketGuestPaymentCoreUnitTest.php
+
+# Run tests from tests/ directory
+cd tests && ../vendor/bin/phpunit unit/
+```
+
+#### Writing New Tests
+
+1. **Create test file** in `tests/unit/` with pattern `*Test.php`
+2. **Extend AbstractTestCase** for WordPress function mocking
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace Wicket\GuestPayment\Tests;
+
+use PHPUnit\Framework\Attributes\CoversClass;
+use WicketGuestPaymentCore;
+
+#[CoversClass(WicketGuestPaymentCore::class)]
+class MyNewTest extends AbstractTestCase
+{
+    private ?WicketGuestPaymentCore $core = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->core = new WicketGuestPaymentCore();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->core = null;
+        parent::tearDown();
+    }
+
+    public function test_something(): void
+    {
+        $this->assertTrue(true);
+    }
+}
+```
+
+3. **Use Brain Monkey** to mock WordPress functions:
+
+```php
+\Brain\Monkey\Functions\stubs([
+    'get_option' => 'value',
+    'update_option' => true,
+    'wc_get_logger' => $mock_logger,
+]);
+```
+
+4. **Run tests** - PHPUnit auto-discovers test files matching `*Test.php`
+
+#### Test Structure
+
+```
+tests/
+├── bootstrap.php              # PHPUnit bootstrap with WordPress mocks
+└── unit/
+    ├── AbstractTestCase.php   # Base test class with Brain Monkey setup
+    ├── WicketGuestPaymentCoreUnitTest.php
+    ├── WicketGuestPaymentAuthTest.php
+    └── ...
+```
+
+#### Manual Testing Checklist
+
+```bash
 - [ ] Generate payment link from order admin
 - [ ] Send payment link via email
 - [ ] Complete guest payment flow
