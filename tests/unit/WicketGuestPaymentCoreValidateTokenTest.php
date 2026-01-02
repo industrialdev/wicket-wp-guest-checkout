@@ -6,6 +6,8 @@ namespace Wicket\GuestPayment\Tests;
 
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use Wicket\GuestPayment\Tests\AbstractTestCase;
 use WicketGuestPaymentCore;
 use Mockery;
@@ -17,6 +19,20 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
     {
         $core = new WicketGuestPaymentCore();
         $this->assertFalse($core->validate_token(''));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function test_validate_token_returns_false_when_encryption_key_missing(): void
+    {
+        $token = 'valid-token';
+
+        Functions\when('wc_get_orders')->justReturn([]);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($token);
+
+        $this->assertFalse($result);
     }
 
     public function test_validate_token_successful_with_order(): void
@@ -195,6 +211,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
     {
         $token = 'valid-token';
         $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
 
         $iv_length = 16;
         $iv = str_repeat('a', $iv_length);
@@ -230,6 +252,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
     public function test_validate_token_returns_false_when_no_order_found(): void
     {
         $token = str_repeat('a', 64);
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'test-key-32-chars-long-exactly-32');
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
 
         Functions\when('wcs_get_subscriptions')->justReturn([]);
         Functions\when('wc_get_orders')->justReturn([]);
@@ -244,6 +272,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
     {
         $token = 'valid-token';
         $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
 
         $iv_length = 16;
         $iv = str_repeat('a', $iv_length);
@@ -268,5 +302,217 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $result = $core->validate_token($token);
 
         $this->assertFalse($result);
+    }
+
+    public function test_validate_token_accepts_subscription_with_active_status(): void
+    {
+        $token = 'valid-token';
+        $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
+
+        $iv_length = 16;
+        $iv = str_repeat('a', $iv_length);
+        $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        $stored_meta_data = base64_encode($iv . $encrypted);
+        $created_time = (string) time();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(123);
+        $order->shouldReceive('get_status')->andReturn('active');
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
+            return in_array('active', $statuses, true);
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
+            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            return null;
+        });
+
+        Functions\when('wcs_get_subscriptions')->alias(function () {
+            return [123 => true];
+        });
+        Functions\when('wc_get_order')->justReturn($order);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($token);
+
+        $this->assertSame($order, $result);
+    }
+
+    public function test_validate_token_rejects_tampered_subscription_token(): void
+    {
+        $token = 'valid-token';
+        $tampered_token = 'invalid-token';
+        $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
+
+        $iv_length = 16;
+        $iv = str_repeat('a', $iv_length);
+        $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        $stored_meta_data = base64_encode($iv . $encrypted);
+        $created_time = (string) time();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(123);
+        $order->shouldReceive('get_status')->andReturn('active');
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
+            return in_array('active', $statuses, true);
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
+            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            return null;
+        });
+
+        Functions\when('wcs_get_subscriptions')->alias(function () {
+            return [123 => true];
+        });
+        Functions\when('wc_get_order')->justReturn($order);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($tampered_token);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_validate_token_rejects_subscription_with_non_allowed_status(): void
+    {
+        $token = 'valid-token';
+        $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
+
+        $iv_length = 16;
+        $iv = str_repeat('a', $iv_length);
+        $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        $stored_meta_data = base64_encode($iv . $encrypted);
+        $created_time = (string) time();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(123);
+        $order->shouldReceive('get_status')->andReturn('cancelled');
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
+            return in_array('cancelled', $statuses, true);
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
+            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            return null;
+        });
+
+        Functions\when('wcs_get_subscriptions')->alias(function () {
+            return [123 => true];
+        });
+        Functions\when('wc_get_order')->justReturn($order);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($token);
+
+        $this->assertEquals('invalid_token', $result);
+    }
+
+    public function test_validate_token_allows_custom_status_via_filter(): void
+    {
+        $token = 'valid-token';
+        $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
+
+        $iv_length = 16;
+        $iv = str_repeat('a', $iv_length);
+        $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        $stored_meta_data = base64_encode($iv . $encrypted);
+        $created_time = (string) time();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(123);
+        $order->shouldReceive('get_status')->andReturn('custom-status');
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
+            return in_array('custom-status', $statuses, true);
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
+            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            return null;
+        });
+
+        Functions\when('apply_filters')->alias(function (string $filter, $value) {
+            if ($filter === 'wicket_guest_payment_allowed_order_statuses') {
+                $value[] = 'custom-status';
+            }
+            return $value;
+        });
+        Functions\when('wcs_get_subscriptions')->justReturn([]);
+        Functions\when('wc_get_orders')->justReturn([123]);
+        Functions\when('wc_get_order')->justReturn($order);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($token);
+
+        $this->assertSame($order, $result);
+    }
+
+    public function test_validate_token_allows_subscription_status_via_filter(): void
+    {
+        $token = 'valid-token';
+        $key = 'test-key-32-chars-long-exactly-32';
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', $key);
+        }
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+        }
+
+        $iv_length = 16;
+        $iv = str_repeat('a', $iv_length);
+        $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
+        $stored_meta_data = base64_encode($iv . $encrypted);
+        $created_time = (string) time();
+
+        $order = Mockery::mock('WC_Order');
+        $order->shouldReceive('get_id')->andReturn(123);
+        $order->shouldReceive('get_status')->andReturn('custom-sub-status');
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
+            return in_array('custom-sub-status', $statuses, true);
+        });
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
+            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            return null;
+        });
+
+        Functions\when('apply_filters')->alias(function (string $filter, $value) {
+            if ($filter === 'wicket_guest_payment_allowed_subscription_statuses') {
+                $value[] = 'custom-sub-status';
+            }
+            return $value;
+        });
+        Functions\when('wcs_get_subscriptions')->alias(function () {
+            return [123 => true];
+        });
+        Functions\when('wc_get_order')->justReturn($order);
+
+        $core = new WicketGuestPaymentCore();
+        $result = $core->validate_token($token);
+
+        $this->assertSame($order, $result);
     }
 }

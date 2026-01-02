@@ -104,7 +104,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
 
         // Display receipt page
         $this->display_receipt_page($order, $token);
-        exit;
+        $this->maybe_exit();
     }
 
     /**

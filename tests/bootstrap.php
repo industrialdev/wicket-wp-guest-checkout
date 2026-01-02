@@ -36,6 +36,10 @@ if (!defined('YEAR_IN_SECONDS')) {
     define('YEAR_IN_SECONDS', 31536000);
 }
 
+if (!defined('WGP_DOING_TESTING')) {
+    define('WGP_DOING_TESTING', true);
+}
+
 // Ensure WooCommerce objects are mockable
 if (!class_exists('WC_Product')) {
     class WC_Product {}

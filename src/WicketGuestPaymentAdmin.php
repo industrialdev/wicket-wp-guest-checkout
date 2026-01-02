@@ -397,7 +397,7 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             $redirect_url = admin_url('post.php?post=' . $order_id . '&action=edit');
         }
         wp_safe_redirect($redirect_url);
-        exit;
+        $this->maybe_exit();
     }
 
     /**

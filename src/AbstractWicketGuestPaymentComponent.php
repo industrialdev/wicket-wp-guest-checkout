@@ -67,4 +67,18 @@ abstract class AbstractWicketGuestPaymentComponent
     {
         return $this->get_plugin()->version;
     }
+
+    /**
+     * Exit helper for runtime flows that should stop processing.
+     *
+     * @return void
+     */
+    protected function maybe_exit(): void
+    {
+        if (defined('WGP_DOING_TESTING') && WGP_DOING_TESTING) {
+            return;
+        }
+
+        exit;
+    }
 }

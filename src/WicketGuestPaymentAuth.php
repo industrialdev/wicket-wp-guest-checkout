@@ -485,7 +485,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                             // Redirect to remove the wgp_cart_key from URL and prevent reprocessing
                             $redirect_url = is_cart() ? wc_get_cart_url() : wc_get_checkout_url();
                             wp_safe_redirect(remove_query_arg('wgp_cart_key', $redirect_url));
-                            exit;
+                            $this->maybe_exit();
                         } else {
                             $this->log(sprintf('Cart is empty after attempting to restore from transient. Secure key: %s', $secure_cart_key), 'warning');
                             // Also delete transient if cart ends up empty
@@ -539,7 +539,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             // Redirect to cart URL with the token to maintain expected guest payment flow
             $redirect_url = add_query_arg('guest_payment_token', $token, wc_get_cart_url());
             wp_safe_redirect($redirect_url);
-            exit;
+            $this->maybe_exit();
         }
 
         // Check if there's a guest payment token in the URL and user is not logged in
@@ -579,7 +579,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 if ($failed_attempts >= self::MAX_FAILED_ATTEMPTS) {
                     $this->log('Rate limit exceeded for token validation attempts from IP: ' . $ip_address);
                     wp_safe_redirect(home_url('/?guest_payment_error=rate_limited'));
-                    exit;
+                    $this->maybe_exit();
                 }
             } else {
                 // Log that rate limiting is skipped for local IP range
@@ -607,7 +607,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                         set_transient($transient_key, $failed_attempts + 1, self::FAILED_ATTEMPT_WINDOW_SECONDS);
                     }
                     wp_safe_redirect(home_url('/?guest_payment_error=expired'));
-                    exit;
+                    $this->maybe_exit();
                 }
 
                 // User Authentication
@@ -754,13 +754,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
                                     // Redirect to cart with the secure key
                                     wp_safe_redirect($redirect_url);
-                                    exit;
+                                    $this->maybe_exit();
                                 } else {
                                     // Log error - couldn't get customer ID after authentication
                                     $this->log('Error: Could not retrieve customer ID after authentication to save cart transient.');
                                     // Redirect to cart anyway, maybe session cart is enough?
                                     wp_safe_redirect(wc_get_cart_url());
-                                    exit;
+                                    $this->maybe_exit();
                                 }
                             } else {
                                 // Cart is empty despite prepare_cart_from_order returning true
@@ -793,7 +793,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                             );
 
                             wp_safe_redirect(home_url('/?guest_payment_error=cart_prep_failed'));
-                            exit;
+                            $this->maybe_exit();
                         }
                     } else {
                         // Cart preparation failed
@@ -818,7 +818,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                         );
 
                         wp_safe_redirect(home_url('/?guest_payment_error=cart_prep_failed'));
-                        exit;
+                        $this->maybe_exit();
                     }
                 } else {
                     $this->log(
@@ -827,7 +827,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
                     // Handle case where user ID is missing (maybe redirect with error?)
                     wp_safe_redirect(home_url('/?guest_payment_error=no_user_id'));
-                    exit;
+                    $this->maybe_exit();
                 }
             } elseif (is_wp_error($order) || $order === false) {
                 // Increment failed attempts count
@@ -838,7 +838,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
                 // Token validation failed (logged within validate_token), redirect to home with error
                 wp_safe_redirect(home_url('/?guest_payment_error=invalid_token'));
-                exit;
+                $this->maybe_exit();
             }
         }
 
@@ -876,9 +876,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
                 // Redirect to cart
                 wp_safe_redirect(wc_get_cart_url());
-                exit;
+                $this->maybe_exit();
                 wp_safe_redirect(wc_get_cart_url());
-                exit;
+                $this->maybe_exit();
             } else {
                 //$this->log('Access allowed for guest session on current page (URL: ' . (isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A') . ').');
             }
@@ -1105,7 +1105,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
             // Redirect to home
             wp_safe_redirect(home_url('/'));
-            exit;
+            $this->maybe_exit();
         }
     }
 

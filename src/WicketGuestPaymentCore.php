@@ -166,7 +166,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             if ($this->prepare_cart_from_order($order)) {
                 // Redirect to the cart page
                 wp_safe_redirect(wc_get_cart_url());
-                exit;
+                $this->maybe_exit();
             } else {
                 // If cart preparation failed, log and redirect home
 
@@ -177,14 +177,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
                 wc_add_notice(__('There was an error preparing your payment. Please contact support.', 'wicket-wgc'), 'error');
                 wp_safe_redirect(home_url()); // Redirect home on critical error
-                exit;
+                $this->maybe_exit();
             }
         } else {
             // Invalid or expired token
             wc_add_notice(__('The payment link is invalid or has expired. Please request a new link.', 'wicket-wgc'), 'error');
             // Redirect to shop or home page
             wp_safe_redirect(wc_get_page_permalink('shop') ?: home_url());
-            exit;
+            $this->maybe_exit();
         }
     }
 
