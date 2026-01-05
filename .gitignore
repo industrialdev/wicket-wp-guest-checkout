@@ -27,6 +27,10 @@ coverage-clover.xml
 coverage-html/
 coverage.serialized
 
+# Browser tests
+tests/Browser/Screenshots/
+Tests/Browser/Screenshots/
+
 # Logs
 *.log
 error_log

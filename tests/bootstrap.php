@@ -63,4 +63,8 @@ if (!class_exists('WC_Order')) {
     class WC_Order {}
 }
 
+if (!defined('PHPUNIT_COMPOSER_INSTALL')) {
+    define('PHPUNIT_COMPOSER_INSTALL', dirname(__DIR__) . '/vendor/autoload.php');
+}
+
 require_once dirname(__DIR__) . '/vendor/autoload.php';

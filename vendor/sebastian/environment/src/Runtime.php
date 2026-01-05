@@ -218,7 +218,7 @@ final class Runtime
      */
     public function hasPCOV(): bool
     {
-        return $this->isPHP() && extension_loaded('pcov') && ini_get('pcov.enabled');
+        return $this->isPHP() && extension_loaded('pcov') && ini_get('pcov.enabled') === '1';
     }
 
     /**
@@ -240,11 +240,15 @@ final class Runtime
         $diff  = [];
         $files = [];
 
-        if ($file = php_ini_loaded_file()) {
+        $file = php_ini_loaded_file();
+
+        if ($file !== false) {
             $files[] = $file;
         }
 
-        if ($scanned = php_ini_scanned_files()) {
+        $scanned = php_ini_scanned_files();
+
+        if ($scanned !== false) {
             $files = array_merge(
                 $files,
                 array_map(
@@ -260,7 +264,7 @@ final class Runtime
             foreach ($values as $value) {
                 $set = ini_get($value);
 
-                if (empty($set)) {
+                if ($set === false || $set === '') {
                     continue;
                 }
 
@@ -273,7 +277,7 @@ final class Runtime
         return $diff;
     }
 
-    private function isOpcacheActive(): bool
+    public function isOpcacheActive(): bool
     {
         if (!extension_loaded('Zend OPcache')) {
             return false;

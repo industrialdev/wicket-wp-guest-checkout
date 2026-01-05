@@ -13,6 +13,7 @@ use const PHP_BINARY;
 use const PHP_SAPI;
 use function array_keys;
 use function array_merge;
+use function array_values;
 use function assert;
 use function fclose;
 use function file_put_contents;
@@ -23,6 +24,7 @@ use function is_array;
 use function is_resource;
 use function proc_close;
 use function proc_open;
+use function str_starts_with;
 use function stream_get_contents;
 use function sys_get_temp_dir;
 use function tempnam;
@@ -127,7 +129,7 @@ final readonly class DefaultJobRunner extends JobRunner
             // @codeCoverageIgnoreEnd
         }
 
-        Facade::emitter()->testRunnerStartedChildProcess();
+        Facade::emitter()->childProcessStarted();
 
         fwrite($pipes[0], $job->code());
         fclose($pipes[0]);
@@ -168,6 +170,16 @@ final readonly class DefaultJobRunner extends JobRunner
         $command     = [PHP_BINARY];
         $phpSettings = $job->phpSettings();
 
+        $xdebugModeConfiguredExplicitly = false;
+
+        foreach ($phpSettings as $phpSetting) {
+            if (str_starts_with($phpSetting, 'xdebug.mode')) {
+                $xdebugModeConfiguredExplicitly = true;
+
+                break;
+            }
+        }
+
         if ($runtime->hasPCOV()) {
             $pcovSettings = ini_get_all('pcov');
 
@@ -194,6 +206,7 @@ final readonly class DefaultJobRunner extends JobRunner
             );
 
             if (
+                !$xdebugModeConfiguredExplicitly &&
                 !CodeCoverage::instance()->isActive() &&
                 xdebug_is_debugger_active() === false &&
                 !$job->requiresXdebug()
@@ -203,7 +216,7 @@ final readonly class DefaultJobRunner extends JobRunner
             }
         }
 
-        $command = array_merge($command, $this->settingsToParameters($phpSettings));
+        $command = array_merge($command, $this->settingsToParameters(array_values($phpSettings)));
 
         if (PHP_SAPI === 'phpdbg') {
             $command[] = '-qrr';

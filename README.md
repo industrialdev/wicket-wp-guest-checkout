@@ -51,7 +51,7 @@ For complete documentation, including configuration examples, integration guides
 
 - **WordPress**: 6.0+
 - **WooCommerce**: 8.0+
-- **PHP**: 8.2+
+- **PHP**: 8.3+
 - **SSL Certificate**: Recommended for production
 
 ## Installation
@@ -242,7 +242,7 @@ ln -s $(pwd) /path/to/wordpress/wp-content/plugins/wicket-guest-checkout
 ### Coding Standards
 
 - PHP: PSR-12 with WordPress modifications
-- PHP Version: 8.2+
+- PHP Version: 8.3+
 - Strict types enabled (`declare(strict_types=1)`)
 - WooCommerce CRUD methods for HPOS compatibility
 - All user input sanitized and validated
@@ -259,7 +259,7 @@ WooCommerce → Status → Logs → Select "wicket-guest-payment"
 
 ### Testing
 
-#### Running PHPUnit Tests
+#### Running Tests (Pest)
 
 ```bash
 # Run all tests
@@ -269,10 +269,26 @@ composer test
 composer test-coverage
 
 # Run specific test file
-./vendor/bin/phpunit tests/unit/WicketGuestPaymentCoreUnitTest.php
+./vendor/bin/pest tests/unit/WicketGuestPaymentCoreUnitTest.php
 
 # Run tests from tests/ directory
-cd tests && ../vendor/bin/phpunit unit/
+cd tests && ../vendor/bin/pest unit/
+```
+
+#### Browser Testing (Pest Browser + Playwright)
+
+```bash
+# Install browser testing dependencies
+composer require pestphp/pest-plugin-browser --dev
+npm install playwright@latest
+npx playwright install
+```
+
+On macOS, `npx playwright install` is usually enough. If WebKit/Safari fails, run:
+
+```bash
+xcode-select --install
+npx playwright install
 ```
 
 #### Writing New Tests

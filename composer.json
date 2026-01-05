@@ -20,13 +20,15 @@
         }
     ],
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.3",
         "composer/installers": "^1.0 || ^2.0"
     },
     "require-dev": {
         "brain/monkey": "^2.6",
         "friendsofphp/php-cs-fixer": "^3.92",
-        "phpunit/phpunit": "^11.0"
+        "pestphp/pest": "^4",
+        "pestphp/pest-plugin-browser": "^4.1",
+        "phpunit/phpunit": "^12"
     },
     "autoload": {
         "psr-4": {
@@ -38,13 +40,15 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "Tests\\": "tests/",
             "Wicket\\GuestPayment\\Tests\\": "tests/unit/"
         }
     },
     "scripts": {
-        "test": "phpunit",
-        "test:unit": "phpunit --testsuite unit",
-        "test:coverage": "phpunit --coverage-html coverage",
+        "test": "pest",
+        "test:unit": "pest --testsuite unit",
+        "test:coverage": "pest --coverage-html coverage",
+        "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest tests/Browser",
         "lint": "php-cs-fixer fix --dry-run --diff",
         "format": "php-cs-fixer fix",
         "check": [
@@ -56,14 +60,16 @@
     "config": {
         "sort-packages": true,
         "allow-plugins": {
-            "composer/installers": true
+            "composer/installers": true,
+            "pestphp/pest-plugin": true
         }
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
     "scripts-descriptions": {
-        "test": "Run PHPUnit tests",
-        "test-coverage": "Run PHPUnit tests with HTML coverage report",
+        "test": "Run Pest tests",
+        "test-coverage": "Run Pest tests with HTML coverage report",
+        "test:browser": "Run Pest browser tests against https://localhost",
         "cs:fix": "Run PHP CS Fixer to fix coding standards issues"
     }
 }
