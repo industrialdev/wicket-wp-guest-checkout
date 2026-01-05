@@ -40,6 +40,18 @@ if (!defined('WGP_DOING_TESTING')) {
     define('WGP_DOING_TESTING', true);
 }
 
+if (!defined('SECURE_AUTH_KEY')) {
+    define('SECURE_AUTH_KEY', 'test-key-32-chars-');
+}
+
+if (!defined('AUTH_KEY')) {
+    define('AUTH_KEY', 'long-exactly-32');
+}
+
+if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+    define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
+}
+
 // Ensure WooCommerce objects are mockable
 if (!class_exists('WC_Product')) {
     class WC_Product {}
