@@ -44,6 +44,4 @@ tmp/
 *.swp
 *~
 .php-cs-fixer.cache
-.php-cs-fixer.cache
 /reference-repo-tests
-.php-cs-fixer.cache
