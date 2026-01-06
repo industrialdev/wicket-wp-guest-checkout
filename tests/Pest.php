@@ -13,6 +13,7 @@
 
 pest()->extend(Tests\TestCase::class)->in('Feature');
 pest()->extend(Tests\TestCase::class)->in('Browser');
+pest()->extend(Wicket\GuestPayment\Tests\AbstractTestCase::class)->in('unit');
 
 /*
 |--------------------------------------------------------------------------

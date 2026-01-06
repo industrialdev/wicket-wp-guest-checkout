@@ -41,6 +41,14 @@ if (!defined('WGP_DOING_TESTING')) {
     define('WGP_DOING_TESTING', true);
 }
 
+if (!defined('COOKIEPATH')) {
+    define('COOKIEPATH', '/');
+}
+
+if (!defined('COOKIE_DOMAIN')) {
+    define('COOKIE_DOMAIN', 'localhost');
+}
+
 if (!defined('SECURE_AUTH_KEY')) {
     define('SECURE_AUTH_KEY', 'test-key-32-chars-');
 }
