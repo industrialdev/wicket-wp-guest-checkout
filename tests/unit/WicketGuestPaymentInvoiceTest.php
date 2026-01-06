@@ -17,8 +17,7 @@ if (!class_exists(__NAMESPACE__ . '\\TestWCOrder')) {
             private string $status = 'pending',
             private string $billing_email = 'guest@example.com',
             private array $meta = []
-        ) {
-        }
+        ) {}
 
         public function get_id(): int
         {
@@ -40,9 +39,7 @@ if (!class_exists(__NAMESPACE__ . '\\TestWCOrder')) {
             return $this->meta[$key] ?? '';
         }
 
-        public function add_order_note(string $note): void
-        {
-        }
+        public function add_order_note(string $note): void {}
     }
 }
 
@@ -122,9 +119,9 @@ class WicketGuestPaymentInvoiceTest extends AbstractTestCase
     public function test_insert_guest_payment_link_email_outputs_message(): void
     {
         Monkey\Functions\when('apply_filters')->justReturn(true);
-        Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
-        Monkey\Functions\when('esc_html')->alias(fn (string $text) => $text);
-        Monkey\Functions\when('__')->alias(fn (string $text) => $text);
+        Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
+        Monkey\Functions\when('esc_html')->alias(fn(string $text) => $text);
+        Monkey\Functions\when('__')->alias(fn(string $text) => $text);
 
         $order = new TestWCOrder(2, 'pending', 'guest@example.com', []);
         $invoice = new TestableWicketGuestPaymentInvoice('https://example.com/pay');
@@ -140,9 +137,9 @@ class WicketGuestPaymentInvoiceTest extends AbstractTestCase
     public function test_append_guest_payment_link_to_pdf_outputs_message(): void
     {
         Monkey\Functions\when('apply_filters')->justReturn(true);
-        Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
-        Monkey\Functions\when('esc_html')->alias(fn (string $text) => $text);
-        Monkey\Functions\when('__')->alias(fn (string $text) => $text);
+        Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
+        Monkey\Functions\when('esc_html')->alias(fn(string $text) => $text);
+        Monkey\Functions\when('__')->alias(fn(string $text) => $text);
 
         $order = new TestWCOrder(3, 'pending', 'guest@example.com', []);
         $invoice = new TestableWicketGuestPaymentInvoice('https://example.com/pay');

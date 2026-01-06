@@ -79,7 +79,7 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
         $_COOKIE['wordpress_logged_in_order'] = '1';
 
         // Create order with pending status
-        $mockOrder = new class(456, 123) {
+        $mockOrder = new class (456, 123) {
             private $orderId;
             private $userId;
 
@@ -89,18 +89,34 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
                 $this->userId = $userId;
             }
 
-            public function get_id(): int { return $this->orderId; }
-            public function get_user_id(): int { return $this->userId; }
-            public function get_status(): string { return 'pending'; }
-            public function has_status($statuses): bool {
+            public function get_id(): int
+            {
+                return $this->orderId;
+            }
+            public function get_user_id(): int
+            {
+                return $this->userId;
+            }
+            public function get_status(): string
+            {
+                return 'pending';
+            }
+            public function has_status($statuses): bool
+            {
                 if (is_array($statuses)) {
                     return in_array('pending', $statuses, true);
                 }
                 return $this->get_status() === $statuses;
             }
-            public function get_cart_hash(): string { return 'test_hash'; }
+            public function get_cart_hash(): string
+            {
+                return 'test_hash';
+            }
             public function set_cart_hash(string $hash): void {}
-            public function save(): int { return $this->orderId; }
+            public function save(): int
+            {
+                return $this->orderId;
+            }
         };
 
         Monkey\Functions\when('get_current_user_id')->justReturn(123);
@@ -109,12 +125,16 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
 
         // Mock WC()->cart
         $mockCart = new class {
-            public function get_cart_hash(): string { return 'test_hash'; }
+            public function get_cart_hash(): string
+            {
+                return 'test_hash';
+            }
         };
 
-        $mockWC = new class($mockCart) {
+        $mockWC = new class ($mockCart) {
             public $cart;
-            public function __construct($cart) {
+            public function __construct($cart)
+            {
                 $this->cart = $cart;
             }
         };
@@ -206,10 +226,11 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
         $session->shouldReceive('get')->with('order_awaiting_payment')->andReturn(999);
         $session->shouldReceive('set')->with('order_awaiting_payment', null)->once();
 
-        $mockWC = new class($cart, $session) {
+        $mockWC = new class ($cart, $session) {
             public $cart;
             public $session;
-            public function __construct($cart, $session) {
+            public function __construct($cart, $session)
+            {
                 $this->cart = $cart;
                 $this->session = $session;
             }
@@ -243,10 +264,11 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
         $order = \Mockery::mock('WC_Order');
         $order->shouldReceive('has_status')->with(['pending', 'failed', 'on-hold'])->andReturn(true);
 
-        $mockWC = new class($cart, $session) {
+        $mockWC = new class ($cart, $session) {
             public $cart;
             public $session;
-            public function __construct($cart, $session) {
+            public function __construct($cart, $session)
+            {
                 $this->cart = $cart;
                 $this->session = $session;
             }
@@ -278,10 +300,11 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
         $session->shouldReceive('get')->with('order_awaiting_payment')->andReturn('123');
         $session->shouldReceive('set')->with('order_awaiting_payment', null)->once();
 
-        $mockWC = new class($cart, $session) {
+        $mockWC = new class ($cart, $session) {
             public $cart;
             public $session;
-            public function __construct($cart, $session) {
+            public function __construct($cart, $session)
+            {
                 $this->cart = $cart;
                 $this->session = $session;
             }
@@ -473,10 +496,11 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
 
         $session = \Mockery::mock();
 
-        $mockWC = new class($cart, $session) {
+        $mockWC = new class ($cart, $session) {
             public $cart;
             public $session;
-            public function __construct($cart, $session) {
+            public function __construct($cart, $session)
+            {
                 $this->cart = $cart;
                 $this->session = $session;
             }
@@ -924,7 +948,7 @@ class WicketGuestPaymentAuthTest extends AbstractTestCase
 
     private function createMockOrder(int $orderId, int $userId): object
     {
-        return new class($orderId, $userId) {
+        return new class ($orderId, $userId) {
             private $orderId;
             private $userId;
 

@@ -193,16 +193,26 @@ class WicketGuestPaymentEmailTest extends AbstractTestCase
     private function createMockOrder(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_meta(string $key, bool $single = false) { return ''; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
+                return '';
+            }
         };
     }
 
     private function createMockOrderWithGuestEmail(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_email') {
                     return 'guest@example.com';
                 }
@@ -214,10 +224,22 @@ class WicketGuestPaymentEmailTest extends AbstractTestCase
     private function createMockOrderWithMethods(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_order_number(): string { return '12345'; }
-            public function get_formatted_order_total(): string { return '$100.00'; }
-            public function get_items(): array { return []; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_order_number(): string
+            {
+                return '12345';
+            }
+            public function get_formatted_order_total(): string
+            {
+                return '$100.00';
+            }
+            public function get_items(): array
+            {
+                return [];
+            }
             public function add_order_note(string $note, bool $is_error = false): void {}
         };
     }

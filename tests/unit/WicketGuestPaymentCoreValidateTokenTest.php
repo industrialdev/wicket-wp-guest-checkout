@@ -50,16 +50,20 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)time();
+        $created_time = (string) time();
 
         // Mock order
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('pending');
         $order->shouldReceive('has_status')->andReturn(true);
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -85,16 +89,20 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)(time() - (8 * DAY_IN_SECONDS)); // Expired 8 days ago
+        $created_time = (string) (time() - (8 * DAY_IN_SECONDS)); // Expired 8 days ago
 
         // Mock order
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('pending');
         $order->shouldReceive('has_status')->andReturn(true);
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -117,16 +125,20 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($original_token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)time();
+        $created_time = (string) time();
 
         // Mock order with original token
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('pending');
         $order->shouldReceive('has_status')->andReturn(true);
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -150,18 +162,22 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)time();
+        $created_time = (string) time();
 
         // Mock order with 'failed' status
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('failed');
-        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function($statuses) {
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
             return in_array('failed', $statuses, true);
         });
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -183,18 +199,22 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)time();
+        $created_time = (string) time();
 
         // Mock order with 'on-hold' status
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('on-hold');
-        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function($statuses) {
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
             return in_array('on-hold', $statuses, true);
         });
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -222,20 +242,24 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $iv = str_repeat('a', $iv_length);
         $encrypted = openssl_encrypt($token, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
         $stored_meta_data = base64_encode($iv . $encrypted);
-        $created_time = (string)time();
+        $created_time = (string) time();
 
         // Mock order with 'completed' status
         $order = Mockery::mock('WC_Order');
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('completed');
-        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function($statuses) {
+        $order->shouldReceive('has_status')->with(Mockery::type('array'))->andReturnUsing(function ($statuses) {
             // has_status returns true if 'completed' is in the allowed statuses array
             // Since 'completed' shouldn't be in allowed statuses, this should return false
             return in_array('completed', $statuses, true);
         });
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -289,9 +313,13 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
         $order->shouldReceive('get_id')->andReturn(123);
         $order->shouldReceive('get_status')->andReturn('pending');
         $order->shouldReceive('has_status')->andReturn(true);
-        $order->shouldReceive('get_meta')->andReturnUsing(function($key) use ($stored_meta_data) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return ''; // Empty timestamp
+        $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data) {
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return '';
+            } // Empty timestamp
             return null;
         });
 
@@ -328,8 +356,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
             return in_array('active', $statuses, true);
         });
         $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -369,8 +401,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
             return in_array('active', $statuses, true);
         });
         $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -409,8 +445,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
             return in_array('cancelled', $statuses, true);
         });
         $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -449,8 +489,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
             return in_array('custom-status', $statuses, true);
         });
         $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 
@@ -494,8 +538,12 @@ class WicketGuestPaymentCoreValidateTokenTest extends AbstractTestCase
             return in_array('custom-sub-status', $statuses, true);
         });
         $order->shouldReceive('get_meta')->andReturnUsing(function ($key) use ($stored_meta_data, $created_time) {
-            if ($key === '_wgp_guest_payment_token_encrypted') return $stored_meta_data;
-            if ($key === '_wgp_guest_payment_token_created') return $created_time;
+            if ($key === '_wgp_guest_payment_token_encrypted') {
+                return $stored_meta_data;
+            }
+            if ($key === '_wgp_guest_payment_token_created') {
+                return $created_time;
+            }
             return null;
         });
 

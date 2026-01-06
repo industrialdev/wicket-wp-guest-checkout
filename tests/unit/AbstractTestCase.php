@@ -20,9 +20,18 @@ abstract class AbstractTestCase extends PHPUnitTestCase
             $wpdb = new class {
                 public $prefix = 'wp_';
                 public $options = 'wp_options';
-                public function get_col($query) { return []; }
-                public function prepare($query, ...$args) { return $query; }
-                public function esc_like($text) { return addcslashes($text, '_%\\'); }
+                public function get_col($query)
+                {
+                    return [];
+                }
+                public function prepare($query, ...$args)
+                {
+                    return $query;
+                }
+                public function esc_like($text)
+                {
+                    return addcslashes($text, '_%\\');
+                }
             };
             $GLOBALS['wpdb'] = $wpdb;
         }
@@ -31,7 +40,7 @@ abstract class AbstractTestCase extends PHPUnitTestCase
         $logger = \Mockery::mock('WC_Logger');
         $logger->shouldReceive('error', 'warning', 'notice', 'info', 'debug', 'critical', 'alert', 'emergency')
             ->byDefault()
-            ->andReturnUsing(function($message) {
+            ->andReturnUsing(function ($message) {
                 // echo "\nLOG: $message\n";
             });
 

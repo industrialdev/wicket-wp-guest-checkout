@@ -33,9 +33,18 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
         $wpdb = new class {
             public $prefix = 'wp_';
             public $options = 'wp_options';
-            public function get_col($query) { return []; }
-            public function prepare($query, ...$args) { return $query; }
-            public function esc_like($text) { return addcslashes($text, '_%\\'); }
+            public function get_col($query)
+            {
+                return [];
+            }
+            public function prepare($query, ...$args)
+            {
+                return $query;
+            }
+            public function esc_like($text)
+            {
+                return addcslashes($text, '_%\\');
+            }
         };
         $GLOBALS['wpdb'] = $wpdb;
 
@@ -143,14 +152,32 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
     private function createMockOrder(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_customer_id(): int { return 1; }
-            public function get_meta(string $key) { return null; }
-            public function meta_exists(string $key): bool { return false; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_customer_id(): int
+            {
+                return 1;
+            }
+            public function get_meta(string $key)
+            {
+                return null;
+            }
+            public function meta_exists(string $key): bool
+            {
+                return false;
+            }
             public function update_meta_data(string $key, $value): void {}
             public function add_order_note(string $note): void {}
-            public function save(): int { return 1; }
+            public function save(): int
+            {
+                return 1;
+            }
         };
     }
 
@@ -160,25 +187,41 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
             public int $saveCount = 0;
             private array $deletedMeta = [];
 
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_customer_id(): int { return 1; }
-            public function get_user_id(): int { return 1; }
-            public function get_meta(string $key) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_customer_id(): int
+            {
+                return 1;
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function get_meta(string $key)
+            {
                 if ($key === '_wgp_guest_payment_user_id') {
                     return 1;
                 }
                 return 'some_value';
             }
             public function update_meta_data(string $key, $value): void {}
-            public function delete_meta_data(string $key): void {
+            public function delete_meta_data(string $key): void
+            {
                 $this->deletedMeta[$key] = true;
             }
-            public function meta_exists(string $key): bool {
+            public function meta_exists(string $key): bool
+            {
                 return !isset($this->deletedMeta[$key]);
             }
             public function add_order_note(string $note): void {}
-            public function save(): int {
+            public function save(): int
+            {
                 $this->saveCount++;
                 return 1;
             }
@@ -188,11 +231,26 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
     private function createMockOrderNoMeta(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_user_id(): int { return 1; }
-            public function meta_exists(string $key): bool { return false; }
-            public function get_meta(string $key, bool $single = false) { return ''; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function meta_exists(string $key): bool
+            {
+                return false;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
+                return '';
+            }
         };
     }
 
@@ -292,7 +350,7 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
         $method = $reflection->getMethod('encrypt_data');
         $encryptedToken = $method->invoke($this->core, $token);
 
-        return new class($encryptedToken) {
+        return new class ($encryptedToken) {
             private $encrypted;
 
             public function __construct($encrypted)
@@ -300,11 +358,24 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
                 $this->encrypted = $encrypted;
             }
 
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_user_id(): int { return 1; }
-            public function meta_exists(string $key): bool { return true; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token_encrypted') {
                     return $this->encrypted;
                 }
@@ -332,7 +403,7 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
         $method = $reflection->getMethod('encrypt_data');
         $encryptedToken = $method->invoke($this->core, $token);
 
-        return new class($encryptedToken) {
+        return new class ($encryptedToken) {
             private $encrypted;
 
             public function __construct($encrypted)
@@ -340,11 +411,24 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
                 $this->encrypted = $encrypted;
             }
 
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_user_id(): int { return 1; }
-            public function meta_exists(string $key): bool { return true; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token_encrypted') {
                     return $this->encrypted;
                 }
@@ -368,11 +452,24 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
     private function createMockOrderWithInvalidEncryption(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_user_id(): int { return 1; }
-            public function meta_exists(string $key): bool { return true; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token_encrypted') {
                     return 'invalid-encrypted-data!!!'; // Invalid base64
                 }
@@ -397,7 +494,7 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
         $method = $reflection->getMethod('encrypt_data');
         $encryptedToken = $method->invoke($this->core, $token);
 
-        return new class($encryptedToken) {
+        return new class ($encryptedToken) {
             private $encrypted;
 
             public function __construct($encrypted)
@@ -405,11 +502,24 @@ class WicketGuestPaymentCoreTokenTest extends AbstractTestCase
                 $this->encrypted = $encrypted;
             }
 
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
-            public function get_user_id(): int { return 0; } // No user ID
-            public function meta_exists(string $key): bool { return true; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
+            public function get_user_id(): int
+            {
+                return 0;
+            } // No user ID
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token_encrypted') {
                     return $this->encrypted;
                 }

@@ -137,11 +137,24 @@ class WicketGuestPaymentAdminTest extends AbstractTestCase
     private function createMockOrderWithoutToken(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_status(): string { return 'pending'; }
-            public function get_user_id(): int { return 1; }
-            public function get_billing_email(): string { return 'customer@example.com'; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_status(): string
+            {
+                return 'pending';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function get_billing_email(): string
+            {
+                return 'customer@example.com';
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token') {
                     return '';
                 }
@@ -153,11 +166,24 @@ class WicketGuestPaymentAdminTest extends AbstractTestCase
     private function createMockOrderWithToken(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_status(): string { return 'pending'; }
-            public function get_user_id(): int { return 1; }
-            public function get_billing_email(): string { return 'customer@example.com'; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_status(): string
+            {
+                return 'pending';
+            }
+            public function get_user_id(): int
+            {
+                return 1;
+            }
+            public function get_billing_email(): string
+            {
+                return 'customer@example.com';
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_token') {
                     return 'existing_token_123';
                 }
@@ -169,15 +195,36 @@ class WicketGuestPaymentAdminTest extends AbstractTestCase
     private function createMockOrderForProcessing(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_status(): string { return 'pending'; }
-            public function has_status($statuses): bool { return true; }
-            public function get_user_id(): int { return 456; }
-            public function get_billing_email(): string { return 'customer@example.com'; }
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_status(): string
+            {
+                return 'pending';
+            }
+            public function has_status($statuses): bool
+            {
+                return true;
+            }
+            public function get_user_id(): int
+            {
+                return 456;
+            }
+            public function get_billing_email(): string
+            {
+                return 'customer@example.com';
+            }
             public function add_order_note(string $note): void {}
-            public function get_meta(string $key, bool $single = false) { return ''; }
+            public function get_meta(string $key, bool $single = false)
+            {
+                return '';
+            }
             public function update_meta_data(string $key, $value): void {}
-            public function save(): int { return 123; }
+            public function save(): int
+            {
+                return 123;
+            }
         };
     }
 

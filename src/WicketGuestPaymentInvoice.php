@@ -21,8 +21,12 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
     {
         // WooCommerce email: insert guest payment message just below 'Pay for this order' link
         add_action('woocommerce_email_before_order_table', [$this, 'insert_guest_payment_link_email'], 15, 4);
-        // PDF Invoices & Packing Slips (Professional) plugin
-        add_action('wpo_wcpdf_after_order_details', [$this, 'append_guest_payment_link_to_pdf'], 99, 2);
+
+        // Check if PDF Invoices & Packing Slips plugin is active before registering PDF hooks
+        if (class_exists('WPO_WCPDF') || class_exists('WPO\IPS\Main')) {
+            // PDF Invoices & Packing Slips plugin - Move to footer
+            add_action('wpo_wcpdf_after_footer', [$this, 'append_guest_payment_link_to_pdf'], 99, 2);
+        }
     }
 
     /**
@@ -72,23 +76,6 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
      */
     private function get_valid_token_data(int $order_id, WC_Order $order): ?array
     {
-        // Check if there's already a token stored
-        $token_hash = $order->get_meta('_wgp_guest_payment_token_hash', true);
-        $user_id = (int) $order->get_meta('_wgp_guest_payment_user_id', true);
-        $created = (int) $order->get_meta('_wgp_guest_payment_token_created', true);
-
-        if (empty($token_hash) || empty($user_id) || empty($created)) {
-            return null;
-        }
-
-        // Check if token has expired (default 7 days)
-        $expiry_days = apply_filters('wicket/wooguestpay/token_expiry_days', 7);
-        $expiry_timestamp = $created + ($expiry_days * DAY_IN_SECONDS);
-
-        if (current_time('timestamp') > $expiry_timestamp) {
-            return null;
-        }
-
         // Get the Core component to validate token
         $main_plugin = WicketGuestPayment::get_instance();
         $core = $main_plugin->get_core();
@@ -97,18 +84,7 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
             return null;
         }
 
-        // Try to decrypt and validate the token
-        $validation_result = $core->validate_guest_payment_token('', $order);
-
-        if ($validation_result === 'valid') {
-            return [
-                'token_hash' => $token_hash,
-                'user_id' => $user_id,
-                'created' => $created,
-            ];
-        }
-
-        return null;
+        return $core->get_valid_token_data($order_id, $order);
     }
 
     /**
@@ -208,8 +184,8 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
      */
     public function append_guest_payment_link_to_pdf($document, $order)
     {
-        // Check if PDF integration is enabled (default: false - requires explicit activation)
-        if (!apply_filters('wicket/wooguestpay/pdf_integration_enabled', false)) {
+        // Check if PDF integration is enabled (default: true)
+        if (!apply_filters('wicket/wooguestpay/pdf_integration_enabled', true)) {
             return;
         }
 
@@ -240,6 +216,6 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
             __('Will someone else be paying this invoice? Use our %s link to complete this transaction.', 'wicket-wgc'),
             $link_html
         );
-        echo '<div style="margin-top:24px;font-size:1em;">' . $message . '</div>';
+        echo '<div style="margin-top:10px;font-size:0.9em;font-style:italic;border-top:1px solid #eee;padding-top:10px;">' . $message . '</div>';
     }
 }

@@ -94,8 +94,8 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             return true;
         }
 
-        // Return default (disabled unless explicitly enabled)
-        return $default_enabled;
+        // Return default (enabled by default)
+        return true;
     }
 
     /**

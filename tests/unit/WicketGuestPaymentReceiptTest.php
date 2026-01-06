@@ -123,16 +123,26 @@ class WicketGuestPaymentReceiptTest extends AbstractTestCase
     private function createMockOrder(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_meta(string $key, bool $single = false) { return ''; }
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
+                return '';
+            }
         };
     }
 
     private function createMockOrderWithoutGuestEmail(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_email') {
                     return '';
                 }
@@ -147,8 +157,12 @@ class WicketGuestPaymentReceiptTest extends AbstractTestCase
     private function createMockOrderWithValidReceiptToken(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_email') {
                     return 'guest@example.com';
                 }
@@ -166,8 +180,12 @@ class WicketGuestPaymentReceiptTest extends AbstractTestCase
     private function createMockOrderNeedingReceiptToken(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 if ($key === '_wgp_guest_payment_email') {
                     return 'guest@example.com';
                 }
@@ -177,15 +195,22 @@ class WicketGuestPaymentReceiptTest extends AbstractTestCase
                 return '';
             }
             public function update_meta_data(string $key, $value): void {}
-            public function save(): int { return 123; }
+            public function save(): int
+            {
+                return 123;
+            }
         };
     }
 
     private function createMockOrderWithoutGuestMeta(): object
     {
         return new class {
-            public function get_id(): int { return 123; }
-            public function get_meta(string $key, bool $single = false) {
+            public function get_id(): int
+            {
+                return 123;
+            }
+            public function get_meta(string $key, bool $single = false)
+            {
                 // No guest payment meta
                 return '';
             }

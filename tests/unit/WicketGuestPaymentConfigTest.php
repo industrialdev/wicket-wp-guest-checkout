@@ -11,9 +11,7 @@ use WicketGuestPaymentConfig;
 if (!class_exists('WP_Error')) {
     class WP_Error
     {
-        public function __construct(string $code = '', string $message = '', $data = null)
-        {
-        }
+        public function __construct(string $code = '', string $message = '', $data = null) {}
     }
 }
 
@@ -80,7 +78,7 @@ class WicketGuestPaymentConfigTest extends AbstractTestCase
     public function test_add_plugin_action_links_prepends_settings_link(): void
     {
         Monkey\Functions\when('admin_url')->justReturn('https://example.com/wp-admin/admin.php');
-        Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
+        Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
         Monkey\Functions\when('esc_html__')->justReturn('Settings');
 
         if (!defined('WICKET_GUEST_CHECKOUT_BASENAME')) {
@@ -95,7 +93,7 @@ class WicketGuestPaymentConfigTest extends AbstractTestCase
 
     public function test_validate_configuration_returns_error_for_invalid_days(): void
     {
-        Monkey\Functions\when('rest_sanitize_boolean')->alias(fn ($value) => (bool) $value);
+        Monkey\Functions\when('rest_sanitize_boolean')->alias(fn($value) => (bool) $value);
 
         $result = $this->config->validate_configuration([
             'email_integration' => true,
@@ -108,8 +106,8 @@ class WicketGuestPaymentConfigTest extends AbstractTestCase
 
     public function test_save_configuration_updates_options(): void
     {
-        Monkey\Functions\when('rest_sanitize_boolean')->alias(fn ($value) => (bool) $value);
-        Monkey\Functions\when('is_wp_error')->alias(fn ($value) => $value instanceof \WP_Error);
+        Monkey\Functions\when('rest_sanitize_boolean')->alias(fn($value) => (bool) $value);
+        Monkey\Functions\when('is_wp_error')->alias(fn($value) => $value instanceof \WP_Error);
         Monkey\Functions\when('update_option')->justReturn(true);
 
         $result = $this->config->save_configuration([

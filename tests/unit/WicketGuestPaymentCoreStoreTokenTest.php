@@ -123,12 +123,24 @@ class WicketGuestPaymentCoreStoreTokenTest extends AbstractTestCase
     private function createMockOrder(): object
     {
         return new class {
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
             public function update_meta_data(string $key, $value): void {}
             public function add_order_note(string $note): void {}
-            public function save(): int { return 1; }
-            public function get_meta(string $key) { return 'some_hash'; }
+            public function save(): int
+            {
+                return 1;
+            }
+            public function get_meta(string $key)
+            {
+                return 'some_hash';
+            }
         };
     }
 
@@ -136,16 +148,29 @@ class WicketGuestPaymentCoreStoreTokenTest extends AbstractTestCase
     {
         return new class {
             public int $saveCount = 0;
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_order'; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_order';
+            }
             public function update_meta_data(string $key, $value): void {}
             public function add_order_note(string $note): void {}
-            public function save(): int {
+            public function save(): int
+            {
                 $this->saveCount++;
                 return 1;
             }
-            public function get_meta(string $key) { return 'some_hash'; }
-            public function meta_exists(string $key): bool { return true; }
+            public function get_meta(string $key)
+            {
+                return 'some_hash';
+            }
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
         };
     }
 
@@ -153,16 +178,29 @@ class WicketGuestPaymentCoreStoreTokenTest extends AbstractTestCase
     {
         return new class {
             public int $saveCount = 0;
-            public function get_id(): int { return 1; }
-            public function get_type(): string { return 'shop_subscription'; }
+            public function get_id(): int
+            {
+                return 1;
+            }
+            public function get_type(): string
+            {
+                return 'shop_subscription';
+            }
             public function update_meta_data(string $key, $value): void {}
             public function add_order_note(string $note): void {}
-            public function save(): int {
+            public function save(): int
+            {
                 $this->saveCount++;
                 return 1;
             }
-            public function get_meta(string $key) { return 'some_hash'; }
-            public function meta_exists(string $key): bool { return true; }
+            public function get_meta(string $key)
+            {
+                return 'some_hash';
+            }
+            public function meta_exists(string $key): bool
+            {
+                return true;
+            }
         };
     }
 }
