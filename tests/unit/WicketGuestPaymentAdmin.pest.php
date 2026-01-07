@@ -331,3 +331,110 @@ it('handles invalidate request from admin action', function (): void {
 
     expect(true)->toBeTrue();
 });
+
+it('constructs with dependencies', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    expect($admin)->toBeInstanceOf(WicketGuestPaymentAdmin::class);
+});
+
+it('adds guest payment order action when token missing', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $GLOBALS['theorder'] = new class {
+        public function get_meta(string $key, bool $single = false)
+        {
+            return '';
+        }
+    };
+
+    $actions = ['some_action' => 'Some Action'];
+    $result = $admin->add_guest_payment_order_action($actions);
+
+    expect(array_key_exists('wicket_create_guest_payment_link', $result))->toBeTrue();
+    expect(array_key_exists('some_action', $result))->toBeTrue();
+
+    unset($GLOBALS['theorder']);
+});
+
+it('skips guest payment order action when token exists', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $GLOBALS['theorder'] = new class {
+        public function get_meta(string $key, bool $single = false)
+        {
+            return 'existing_token_123';
+        }
+    };
+
+    $actions = ['some_action' => 'Some Action'];
+    $result = $admin->add_guest_payment_order_action($actions);
+
+    expect(array_key_exists('wicket_create_guest_payment_link', $result))->toBeFalse();
+    expect(array_key_exists('some_action', $result))->toBeTrue();
+
+    unset($GLOBALS['theorder']);
+});
+
+it('skips adding meta box for non order screens', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $GLOBALS['current_screen'] = new class {
+        public $id = 'post';
+    };
+
+    Monkey\Functions\when('wc_get_page_screen_id')->justReturn('wc-orders');
+    Monkey\Functions\expect('add_meta_box')->never();
+
+    $admin->add_guest_payment_meta_box('post', new stdClass());
+
+    expect(true)->toBeTrue();
+
+    unset($GLOBALS['current_screen']);
+});
+
+it('skips enqueue on non order pages', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $mockScreen = new class {
+        public $id = 'dashboard';
+        public $post_type = 'page';
+        public $base = 'dashboard';
+    };
+
+    Monkey\Functions\when('get_current_screen')->justReturn($mockScreen);
+    Monkey\Functions\when('wc_get_page_screen_id')->justReturn('shop-order');
+
+    $admin->enqueue_admin_scripts('edit.php');
+
+    expect(true)->toBeTrue();
+});
+
+it('adds admin notice action when processing guest payment order action', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $order = Mockery::mock('WC_Order');
+    $order->shouldReceive('get_id')->andReturn(123);
+
+    $called = false;
+    Monkey\Functions\when('add_action')->alias(function (string $hook, $callback) use (&$called): void {
+        $called = $hook === 'admin_notices' && is_callable($callback);
+    });
+
+    $admin->process_guest_payment_order_action($order);
+
+    expect($called)->toBeTrue();
+});

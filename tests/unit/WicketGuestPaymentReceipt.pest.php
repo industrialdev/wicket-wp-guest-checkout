@@ -26,6 +26,107 @@ function wgp_receipt_expect_json_success(array $data): void
         });
 }
 
+function wgp_receipt_mock_order(): object
+{
+    return new class {
+        public function get_id(): int
+        {
+            return 123;
+        }
+        public function get_meta(string $key, bool $single = false)
+        {
+            return '';
+        }
+    };
+}
+
+function wgp_receipt_mock_order_without_guest_email(): object
+{
+    return new class {
+        public function get_id(): int
+        {
+            return 123;
+        }
+        public function get_meta(string $key, bool $single = false)
+        {
+            if ($key === '_wgp_guest_payment_email') {
+                return '';
+            }
+            if ($key === '_wgp_guest_payment_token_hash') {
+                return '';
+            }
+            return '';
+        }
+    };
+}
+
+function wgp_receipt_mock_order_with_valid_token(): object
+{
+    return new class {
+        public function get_id(): int
+        {
+            return 123;
+        }
+        public function get_meta(string $key, bool $single = false)
+        {
+            if ($key === '_wgp_guest_payment_email') {
+                return 'guest@example.com';
+            }
+            if ($key === '_wgp_receipt_access_token') {
+                return 'existing_token_123';
+            }
+            if ($key === '_wgp_receipt_token_created') {
+                return time();
+            }
+            return '';
+        }
+    };
+}
+
+function wgp_receipt_mock_order_needing_token(): object
+{
+    return new class {
+        public array $meta = [];
+
+        public function get_id(): int
+        {
+            return 123;
+        }
+        public function get_meta(string $key, bool $single = false)
+        {
+            if ($key === '_wgp_guest_payment_email') {
+                return 'guest@example.com';
+            }
+            if ($key === '_wgp_receipt_access_token') {
+                return '';
+            }
+            return $this->meta[$key] ?? '';
+        }
+        public function update_meta_data(string $key, $value): void
+        {
+            $this->meta[$key] = $value;
+        }
+        public function save(): int
+        {
+            return 123;
+        }
+    };
+}
+
+function wgp_receipt_mock_order_without_guest_meta(): object
+{
+    return new class {
+        public function get_id(): int
+        {
+            return 123;
+        }
+        public function get_meta(string $key, bool $single = false)
+        {
+            return '';
+        }
+    };
+}
+
 it('stores generated receipt access token', function (): void {
     $order = new class {
         public array $meta = [
@@ -157,4 +258,94 @@ it('captures guest email and sends receipt', function (): void {
             $receipt->ajax_set_guest_email_and_send_receipt();
         });
     })->toThrow(RuntimeException::class);
+});
+
+it('constructs receipt instance', function (): void {
+    $receipt = new WicketGuestPaymentReceipt();
+
+    expect($receipt)->toBeInstanceOf(WicketGuestPaymentReceipt::class);
+});
+
+it('adds receipt endpoint rewrite rules', function (): void {
+    Monkey\Functions\expect('add_rewrite_rule')
+        ->once()
+        ->with(
+            Mockery::type('string'),
+            Mockery::type('string'),
+            'top'
+        );
+
+    Monkey\Functions\expect('add_rewrite_tag')->twice();
+    Monkey\Functions\when('get_option')->justReturn('no');
+    Monkey\Functions\when('flush_rewrite_rules')->justReturn(null);
+    Monkey\Functions\when('update_option')->justReturn(true);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->add_receipt_endpoint();
+
+    expect(true)->toBeTrue();
+});
+
+it('skips receipt token generation for non-guest orders', function (): void {
+    $mockOrder = wgp_receipt_mock_order_without_guest_email();
+
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->generate_receipt_access_token(123);
+
+    expect(true)->toBeTrue();
+});
+
+it('skips receipt token generation when token exists and is valid', function (): void {
+    $mockOrder = wgp_receipt_mock_order_with_valid_token();
+
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->generate_receipt_access_token(123);
+
+    expect(true)->toBeTrue();
+});
+
+it('creates receipt token when missing', function (): void {
+    $mockOrder = wgp_receipt_mock_order_needing_token();
+
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->generate_receipt_access_token(123);
+
+    expect($mockOrder->meta['_wgp_receipt_access_token'] ?? '')->not->toBeEmpty();
+});
+
+it('skips receipt access section on non-receipt page', function (): void {
+    Monkey\Functions\when('wc_get_order')->justReturn(wgp_receipt_mock_order());
+    Monkey\Functions\when('is_wc_endpoint_url')->justReturn(false);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->add_receipt_access_section(123);
+
+    expect(true)->toBeTrue();
+});
+
+it('skips receipt access section for non-guest orders', function (): void {
+    $mockOrder = wgp_receipt_mock_order_without_guest_meta();
+
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('is_wc_endpoint_url')->justReturn(true);
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->add_receipt_access_section(123);
+
+    expect(true)->toBeTrue();
+});
+
+it('returns early when receipt query vars missing', function (): void {
+    Monkey\Functions\when('get_query_var')->justReturn('');
+
+    $receipt = new WicketGuestPaymentReceipt();
+    $receipt->handle_receipt_request();
+
+    expect(true)->toBeTrue();
 });

@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use PHPUnit\Framework\ExpectationFailedException;
-
 it('does not populate cart or checkout without a valid guest payment token', function (): void {
     $baseUrl = wgp_browser_base_url();
 
