@@ -298,11 +298,18 @@ composer test:browser
 
 #### Browser Testing (Pest Browser + Playwright)
 
+**Prerequisites:** Browser tests require a local WordPress instance running with the Wicket Docker setup. Ensure you have a site (e.g., PACE or any other) running locally before executing browser tests.
+
 ```bash
 # Install browser testing dependencies
 composer require pestphp/pest-plugin-browser --dev
+
+# Option 1: Install Playwright locally
 npm install playwright@latest
 npx playwright install
+
+# Option 2: Install Playwright globally (if desired)
+npm install -g playwright@latest && npx playwright install
 ```
 
 On macOS, `npx playwright install` is usually enough. If WebKit/Safari fails, run:
