@@ -235,9 +235,25 @@ apply_filters('wicket_guest_payment_email_content', $content, $order, $token);
 git clone https://github.com/wicket/wicket-guest-checkout.git
 cd wicket-guest-checkout
 
+# Install dependencies
+composer install
+
 # Install in WordPress
 ln -s $(pwd) /path/to/wordpress/wp-content/plugins/wicket-guest-checkout
 ```
+
+### ⚠️ IMPORTANT: Before Tagging a New Version
+
+**Always run `composer production` before tagging a new version.** This command:
+- Removes development dependencies
+- Optimizes autoloader for production
+- Generates a clean build without dev packages
+
+```bash
+composer production
+```
+
+Without this step, the plugin will include unnecessary dev dependencies in the release.
 
 ### Coding Standards
 
@@ -259,20 +275,25 @@ WooCommerce → Status → Logs → Select "wicket-guest-payment"
 
 ### Testing
 
-#### Running Tests (Pest)
+The plugin uses **PEST** and **PHPUnit** for testing.
+
+#### Running Tests
 
 ```bash
 # Run all tests
 composer test
 
+# Run unit tests only
+composer test:unit
+
 # Run tests with coverage report
-composer test-coverage
+composer test:coverage
+
+# Run browser tests
+composer test:browser
 
 # Run specific test file
 ./vendor/bin/pest tests/unit/WicketGuestPaymentCoreUnitTest.php
-
-# Run tests from tests/ directory
-cd tests && ../vendor/bin/pest unit/
 ```
 
 #### Browser Testing (Pest Browser + Playwright)
@@ -365,6 +386,19 @@ tests/
 - [ ] Test rate limiting
 - [ ] Verify session cleanup
 - [ ] Check receipt access
+```
+
+### Available Composer Scripts
+
+```bash
+composer production       # Build for production (remove dev deps, optimize autoload)
+composer test            # Run all tests
+composer test:unit       # Run unit tests only
+composer test:coverage   # Run tests with HTML coverage report
+composer test:browser    # Run browser tests
+composer lint            # Check code style
+composer format          # Fix code style
+composer check           # Run lint + test
 ```
 
 ## Security Considerations

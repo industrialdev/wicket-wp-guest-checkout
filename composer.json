@@ -45,6 +45,7 @@
         }
     },
     "scripts": {
+        "production": "composer dump-autoload --optimize --no-dev",
         "test": "pest",
         "test:unit": "pest --testsuite unit",
         "test:coverage": "pest --coverage-html coverage",
