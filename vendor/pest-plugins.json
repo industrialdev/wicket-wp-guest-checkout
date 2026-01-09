@@ -19,6 +19,6 @@
     "Pest\\Plugins\\Shard",
     "Pest\\Plugins\\Parallel",
     "Pest\\Arch\\Plugin",
-    "Pest\\Browser\\Plugin",
-    "Pest\\Profanity\\Plugin"
+    "Pest\\Profanity\\Plugin",
+    "Pest\\Browser\\Plugin"
 ]

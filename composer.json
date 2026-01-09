@@ -24,10 +24,10 @@
         "composer/installers": "^1.0 || ^2.0"
     },
     "require-dev": {
-        "brain/monkey": "^2.6",
-        "friendsofphp/php-cs-fixer": "^3.92",
+        "brain/monkey": "^2",
+        "friendsofphp/php-cs-fixer": "^3",
         "pestphp/pest": "^4",
-        "pestphp/pest-plugin-browser": "^4.1",
+        "pestphp/pest-plugin-browser": "^4",
         "phpunit/phpunit": "^12"
     },
     "autoload": {
