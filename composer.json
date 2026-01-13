@@ -49,7 +49,7 @@
         "test": "pest",
         "test:unit": "pest --testsuite unit",
         "test:coverage": "pest --coverage-html coverage",
-        "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest tests/Browser",
+        "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser",
         "lint": "php-cs-fixer fix --dry-run --diff",
         "format": "php-cs-fixer fix",
         "check": [

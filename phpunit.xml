@@ -13,6 +13,9 @@
             <directory suffix="Test.php">tests/unit</directory>
             <directory suffix="pest.php">tests/unit</directory>
         </testsuite>
+        <testsuite name="browser">
+            <directory suffix=".pest.php">tests/Browser</directory>
+        </testsuite>
     </testsuites>
 
     <source restrictNotices="true" restrictWarnings="true">

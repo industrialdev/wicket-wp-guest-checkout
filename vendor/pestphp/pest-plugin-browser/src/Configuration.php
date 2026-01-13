@@ -98,7 +98,7 @@ final readonly class Configuration
     /**
      * Sets the host for the server.
      */
-    public function withHost(string $host): self
+    public function withHost(?string $host): self
     {
         Playwright::setHost($host);
 

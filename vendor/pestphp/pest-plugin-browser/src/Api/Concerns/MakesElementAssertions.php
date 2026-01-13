@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Pest\Browser\Api\Concerns;
 
-use Illuminate\Support\Str;
 use Pest\Browser\Api\Webpage;
 use PHPUnit\Framework\ExpectationFailedException;
 
@@ -155,7 +154,7 @@ trait MakesElementAssertions
      */
     public function assertScript(string $expression, mixed $expected = true): Webpage
     {
-        if (! Str::contains($expression, ['===', '!==', '==', '!=', '>', '<', '>=', '<=', '&&', '||']) && ! Str::startsWith($expression, 'return ') && ! Str::startsWith($expression, 'function')) {
+        if (! self::strContainsAny($expression, ['===', '!==', '==', '!=', '>', '<', '>=', '<=', '&&', '||']) && ! str_starts_with($expression, 'return ') && ! str_starts_with($expression, 'function')) {
             $expression = "function() { return {$expression}; }";
         }
 
@@ -592,5 +591,22 @@ trait MakesElementAssertions
         $text = (string) $text;
 
         return $this->assertSee($text);
+    }
+
+    /**
+     * Return true if haystack contains any of the given needles
+     *
+     * @param  string  $haystack  String to look in
+     * @param  array<int, string>  $needles  List of needles to look for in haystack
+     */
+    private static function strContainsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
