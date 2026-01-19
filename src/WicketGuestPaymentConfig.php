@@ -3,13 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Guest Subscription Payment Flow for WooCommerce - Configuration Class
+ * Guest Subscription Payment Flow for WooCommerce - Configuration Class.
  *
  * Handles all configuration options, filters, and constants for the plugin.
  * Provides a centralized way to manage plugin settings and integration toggles.
- *
- * @package Wicket
- * @subpackage GuestPayment
  */
 
 // No direct access
@@ -114,7 +111,6 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
 
         return $default_days;
     }
-
 
     /**
      * Get boolean value from WordPress option.

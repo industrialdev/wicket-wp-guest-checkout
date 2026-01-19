@@ -33,6 +33,7 @@ function wgp_receipt_mock_order(): object
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return '';
@@ -47,6 +48,7 @@ function wgp_receipt_mock_order_without_guest_email(): object
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_email') {
@@ -55,6 +57,7 @@ function wgp_receipt_mock_order_without_guest_email(): object
             if ($key === '_wgp_guest_payment_token_hash') {
                 return '';
             }
+
             return '';
         }
     };
@@ -67,6 +70,7 @@ function wgp_receipt_mock_order_with_valid_token(): object
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_email') {
@@ -78,6 +82,7 @@ function wgp_receipt_mock_order_with_valid_token(): object
             if ($key === '_wgp_receipt_token_created') {
                 return time();
             }
+
             return '';
         }
     };
@@ -92,6 +97,7 @@ function wgp_receipt_mock_order_needing_token(): object
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_email') {
@@ -100,12 +106,15 @@ function wgp_receipt_mock_order_needing_token(): object
             if ($key === '_wgp_receipt_access_token') {
                 return '';
             }
+
             return $this->meta[$key] ?? '';
         }
+
         public function update_meta_data(string $key, $value): void
         {
             $this->meta[$key] = $value;
         }
+
         public function save(): int
         {
             return 123;
@@ -120,6 +129,7 @@ function wgp_receipt_mock_order_without_guest_meta(): object
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return '';
@@ -137,14 +147,17 @@ it('stores generated receipt access token', function (): void {
         {
             return 123;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return $this->meta[$key] ?? '';
         }
+
         public function update_meta_data(string $key, $value): void
         {
             $this->meta[$key] = $value;
         }
+
         public function save(): int
         {
             return 123;
@@ -173,6 +186,7 @@ it('sends receipt email via ajax', function (): void {
         if ($key === '_wgp_receipt_access_token') {
             return 'token123';
         }
+
         return '';
     });
 
@@ -211,26 +225,32 @@ it('captures guest email and sends receipt', function (): void {
         {
             return 123;
         }
+
         public function get_order_number(): string
         {
             return '1001';
         }
+
         public function get_date_created(): DateTime
         {
             return new DateTime('2024-01-01');
         }
+
         public function get_formatted_order_total(): string
         {
             return '$10.00';
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return $this->meta[$key] ?? '';
         }
+
         public function update_meta_data(string $key, $value): void
         {
             $this->meta[$key] = $value;
         }
+
         public function save(): int
         {
             return 123;

@@ -16,7 +16,7 @@ defined('ABSPATH') || exit;
  *
  * Provides consistent logging across all guest payment components using WooCommerce logger.
  */
-trait WicketGuestPaymentLogger
+trait TraitWicketGuestPaymentLogger
 {
     /**
      * Log a message using WooCommerce logger.

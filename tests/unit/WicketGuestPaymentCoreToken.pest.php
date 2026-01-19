@@ -20,14 +20,17 @@ function wgp_core_token_boot(): WicketGuestPaymentCore
     $wpdb = new class {
         public $prefix = 'wp_';
         public $options = 'wp_options';
+
         public function get_col($query)
         {
             return [];
         }
+
         public function prepare($query, ...$args)
         {
             return $query;
         }
+
         public function esc_like($text)
         {
             return addcslashes($text, '_%\\');
@@ -45,24 +48,31 @@ function wgp_core_token_mock_order(): object
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_customer_id(): int
         {
             return 1;
         }
+
         public function get_meta(string $key)
         {
             return null;
         }
+
         public function meta_exists(string $key): bool
         {
             return false;
         }
+
         public function update_meta_data(string $key, $value): void {}
+
         public function add_order_note(string $note): void {}
+
         public function save(): int
         {
             return 1;
@@ -80,38 +90,49 @@ function wgp_core_token_mock_order_with_meta(): object
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_customer_id(): int
         {
             return 1;
         }
+
         public function get_user_id(): int
         {
             return 1;
         }
+
         public function get_meta(string $key)
         {
             if ($key === '_wgp_guest_payment_user_id') {
                 return 1;
             }
+
             return 'some_value';
         }
+
         public function update_meta_data(string $key, $value): void {}
+
         public function delete_meta_data(string $key): void
         {
             $this->deletedMeta[$key] = true;
         }
+
         public function meta_exists(string $key): bool
         {
             return !isset($this->deletedMeta[$key]);
         }
+
         public function add_order_note(string $note): void {}
+
         public function save(): int
         {
             $this->saveCount++;
+
             return 1;
         }
     };
@@ -124,18 +145,22 @@ function wgp_core_token_mock_order_no_meta(): object
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_user_id(): int
         {
             return 1;
         }
+
         public function meta_exists(string $key): bool
         {
             return false;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return '';
@@ -264,7 +289,7 @@ it('returns null when no token exists', function (): void {
 it('returns null for expired token', function (): void {
     $core = wgp_core_token_boot();
 
-    $mockOrder = new class ($core) {
+    $mockOrder = new class($core) {
         private string $encrypted;
 
         public function __construct(WicketGuestPaymentCore $core)
@@ -279,18 +304,22 @@ it('returns null for expired token', function (): void {
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_user_id(): int
         {
             return 1;
         }
+
         public function meta_exists(string $key): bool
         {
             return true;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_token_encrypted') {
@@ -308,6 +337,7 @@ it('returns null for expired token', function (): void {
             if ($key === '_wgp_guest_payment_generation_method') {
                 return 'email';
             }
+
             return '';
         }
     };
@@ -324,7 +354,7 @@ it('returns null for expired token', function (): void {
 it('returns data for valid token', function (): void {
     $core = wgp_core_token_boot();
 
-    $mockOrder = new class ($core) {
+    $mockOrder = new class($core) {
         private string $encrypted;
 
         public function __construct(WicketGuestPaymentCore $core)
@@ -339,18 +369,22 @@ it('returns data for valid token', function (): void {
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_user_id(): int
         {
             return 1;
         }
+
         public function meta_exists(string $key): bool
         {
             return true;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_token_encrypted') {
@@ -368,6 +402,7 @@ it('returns data for valid token', function (): void {
             if ($key === '_wgp_guest_payment_generation_method') {
                 return 'email';
             }
+
             return '';
         }
     };
@@ -393,18 +428,22 @@ it('returns null when decryption fails', function (): void {
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_user_id(): int
         {
             return 1;
         }
+
         public function meta_exists(string $key): bool
         {
             return true;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_token_encrypted') {
@@ -419,6 +458,7 @@ it('returns null when decryption fails', function (): void {
             if ($key === '_wgp_guest_payment_user_id') {
                 return 1;
             }
+
             return '';
         }
     };
@@ -435,7 +475,7 @@ it('returns null when decryption fails', function (): void {
 it('returns null when user id missing', function (): void {
     $core = wgp_core_token_boot();
 
-    $mockOrder = new class ($core) {
+    $mockOrder = new class($core) {
         private string $encrypted;
 
         public function __construct(WicketGuestPaymentCore $core)
@@ -450,18 +490,22 @@ it('returns null when user id missing', function (): void {
         {
             return 1;
         }
+
         public function get_type(): string
         {
             return 'shop_order';
         }
+
         public function get_user_id(): int
         {
             return 0;
         }
+
         public function meta_exists(string $key): bool
         {
             return true;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_token_encrypted') {
@@ -476,6 +520,7 @@ it('returns null when user id missing', function (): void {
             if ($key === '_wgp_guest_payment_user_id') {
                 return 0;
             }
+
             return '';
         }
     };

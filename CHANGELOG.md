@@ -58,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Admin-only "Pay For Customer" impersonation flow with automatic return after payment
+
 ### Planned
 - Settings page in WooCommerce admin
 - Configurable token expiry time via admin

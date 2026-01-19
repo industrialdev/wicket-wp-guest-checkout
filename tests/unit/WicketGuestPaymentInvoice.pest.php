@@ -120,9 +120,9 @@ it('generates token when missing', function (): void {
 
 it('outputs guest payment link in email', function (): void {
     Monkey\Functions\when('apply_filters')->justReturn(true);
-    Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
-    Monkey\Functions\when('esc_html')->alias(fn(string $text) => $text);
-    Monkey\Functions\when('__')->alias(fn(string $text) => $text);
+    Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
+    Monkey\Functions\when('esc_html')->alias(fn (string $text) => $text);
+    Monkey\Functions\when('__')->alias(fn (string $text) => $text);
 
     $order = new TestWCOrder(2, 'pending', 'guest@example.com', []);
     $invoice = new TestableWicketGuestPaymentInvoice('https://example.com/pay');
@@ -137,9 +137,9 @@ it('outputs guest payment link in email', function (): void {
 
 it('outputs guest payment link in pdf', function (): void {
     Monkey\Functions\when('apply_filters')->justReturn(true);
-    Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
-    Monkey\Functions\when('esc_html')->alias(fn(string $text) => $text);
-    Monkey\Functions\when('__')->alias(fn(string $text) => $text);
+    Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
+    Monkey\Functions\when('esc_html')->alias(fn (string $text) => $text);
+    Monkey\Functions\when('__')->alias(fn (string $text) => $text);
 
     $order = new TestWCOrder(3, 'pending', 'guest@example.com', []);
     $invoice = new TestableWicketGuestPaymentInvoice('https://example.com/pay');

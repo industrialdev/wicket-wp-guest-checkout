@@ -127,6 +127,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             if ($order->get_meta('_wgp_guest_payment_token_hash', true)) {
                 $this->log(sprintf('Skipping receipt token generation for Order ID %d: No guest email associated yet.', $order_id));
             }
+
             return;
         }
 
@@ -515,6 +516,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         $order = wc_get_order($order_or_id);
         if (!$order instanceof WC_Order) {
             $this->log('add_receipt_access_section: Invalid order provided.', 'error');
+
             return;
         }
         $order_id = $order->get_id();
@@ -530,6 +532,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         // We check for token hash (active) OR guest user ID (historical/completed), as hash is removed after payment.
         if (!$order->get_meta('_wgp_guest_payment_token_hash', true) && !$order->get_meta('_wgp_guest_payment_user_id', true)) {
             $this->log(sprintf('Skipping Order ID %d: Not a guest payment order (no token hash or guest user ID).', $order_id));
+
             return;
         }
 
@@ -538,6 +541,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         // CASE 1: No email associated -> Show form to capture it
         if (empty($guest_email)) {
             $this->render_email_capture_form($order_id);
+
             return;
         }
 

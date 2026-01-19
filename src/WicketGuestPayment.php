@@ -39,7 +39,7 @@ if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
  */
 class WicketGuestPayment
 {
-    use WicketGuestPaymentLogger;
+    use TraitWicketGuestPaymentLogger;
 
     /**
      * Plugin URL.
@@ -96,6 +96,13 @@ class WicketGuestPayment
      * @var WicketGuestPaymentAdmin|null
      */
     private $admin;
+
+    /**
+     * Admin pay functionality class instance.
+     *
+     * @var WicketGuestPaymentAdminPay|null
+     */
+    private $admin_pay;
 
     /**
      * Notice functionality class instance.
@@ -226,6 +233,10 @@ class WicketGuestPayment
             $this->admin = new WicketGuestPaymentAdmin($this->core, $this->email);
             $this->admin->init();
         }
+
+        // Initialize admin pay flow
+        $this->admin_pay = new WicketGuestPaymentAdminPay();
+        $this->admin_pay->init_hooks();
 
         // Initialize invoice integration
         if (class_exists('WicketGuestPaymentInvoice')) {

@@ -130,15 +130,16 @@ class ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01
         'Composer\\Installers\\YawikInstaller' => __DIR__ . '/..' . '/composer/installers/src/Composer/Installers/YawikInstaller.php',
         'Composer\\Installers\\ZendInstaller' => __DIR__ . '/..' . '/composer/installers/src/Composer/Installers/ZendInstaller.php',
         'Composer\\Installers\\ZikulaInstaller' => __DIR__ . '/..' . '/composer/installers/src/Composer/Installers/ZikulaInstaller.php',
+        'TraitWicketGuestPaymentLogger' => __DIR__ . '/../..' . '/src/TraitWicketGuestPaymentLogger.php',
         'WicketGuestPayment' => __DIR__ . '/../..' . '/src/WicketGuestPayment.php',
         'WicketGuestPaymentAdmin' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdmin.php',
+        'WicketGuestPaymentAdminPay' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdminPay.php',
         'WicketGuestPaymentAuth' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAuth.php',
         'WicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/WicketGuestPaymentComponent.php',
         'WicketGuestPaymentConfig' => __DIR__ . '/../..' . '/src/WicketGuestPaymentConfig.php',
         'WicketGuestPaymentCore' => __DIR__ . '/../..' . '/src/WicketGuestPaymentCore.php',
         'WicketGuestPaymentEmail' => __DIR__ . '/../..' . '/src/WicketGuestPaymentEmail.php',
         'WicketGuestPaymentInvoice' => __DIR__ . '/../..' . '/src/WicketGuestPaymentInvoice.php',
-        'WicketGuestPaymentLogger' => __DIR__ . '/../..' . '/src/TraitWicketGuestPaymentLogger.php',
         'WicketGuestPaymentReceipt' => __DIR__ . '/../..' . '/src/WicketGuestPaymentReceipt.php',
     );
 

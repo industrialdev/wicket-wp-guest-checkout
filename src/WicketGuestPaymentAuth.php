@@ -83,6 +83,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         // HARD STOPPER: Validate order ID before checkout processing (last line of defense)
         add_action('woocommerce_checkout_process', [$this, 'validate_guest_payment_order_before_checkout'], 1); // Classic Checkout
         add_action('woocommerce_checkout_validate_order_before_payment', [$this, 'validate_guest_payment_order_before_payment_block'], 1, 2); // Block Checkout
+
     }
 
     /**

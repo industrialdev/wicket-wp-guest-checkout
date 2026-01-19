@@ -309,8 +309,43 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
 			<div class="wicket-ajax-feedback wicket-ajax-feedback-bottom notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
 		</div>
 
+		<hr style="margin: 20px 0;">
+		<h4><?php esc_html_e('Pay For Customer', 'wicket-wgc'); ?></h4>
+		<p><?php esc_html_e('Open a secure checkout session for this order. You will be returned to this order after payment completes.', 'wicket-wgc'); ?></p>
+		<?php
+        if (!$this->current_user_is_admin()) {
+            echo '<p><em>' . esc_html__('Admin access required.', 'wicket-wgc') . '</em></p>';
+        } else {
+            $pay_user_id = (int) $order->get_customer_id();
+            if (!$pay_user_id) {
+                echo '<p><em>' . esc_html__('This order must be assigned to a customer before paying on their behalf.', 'wicket-wgc') . '</em></p>';
+            } else {
+                $admin_pay_url = wp_nonce_url(
+                    admin_url('admin-post.php?action=wicket_admin_pay&order_id=' . $order_id),
+                    'wicket_admin_pay_' . $order_id
+                );
+                ?>
+				<a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
+					<?php esc_html_e('Pay Now', 'wicket-wgc'); ?>
+				</a>
+				<p class="description" style="margin-top: 8px;"><?php esc_html_e('Opens in a new tab and temporarily switches to the customer for payment.', 'wicket-wgc'); ?></p>
+			<?php
+            }
+        }
+        ?>
+
 <?php
         // END: Add 'Generate Link Manually' Button
+    }
+
+    private function current_user_is_admin(): bool
+    {
+        $user = wp_get_current_user();
+        if (!$user || empty($user->roles) || !is_array($user->roles)) {
+            return false;
+        }
+
+        return in_array('administrator', $user->roles, true);
     }
 
     /**

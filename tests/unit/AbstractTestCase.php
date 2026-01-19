@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Wicket\GuestPayment\Tests;
 
-use PHPUnit\Framework\TestCase as PHPUnitTestCase;
 use Brain\Monkey;
+use PHPUnit\Framework\TestCase as PHPUnitTestCase;
 
 abstract class AbstractTestCase extends PHPUnitTestCase
 {
@@ -20,14 +20,17 @@ abstract class AbstractTestCase extends PHPUnitTestCase
             $wpdb = new class {
                 public $prefix = 'wp_';
                 public $options = 'wp_options';
+
                 public function get_col($query)
                 {
                     return [];
                 }
+
                 public function prepare($query, ...$args)
                 {
                     return $query;
                 }
+
                 public function esc_like($text)
                 {
                     return addcslashes($text, '_%\\');

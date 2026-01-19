@@ -193,7 +193,7 @@ it('returns null for expired token data', function (): void {
     $encrypted = wgp_core_unit_encrypt_token_for_test($token);
     $expired_timestamp = time() - (8 * DAY_IN_SECONDS);
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) use ($encrypted, $expired_timestamp) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => $encrypted,
@@ -215,7 +215,7 @@ it('removes cart items with missing product id', function (): void {
 
     $notice_called = false;
 
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $cart = new TestCart([
         'item_1' => [
             'product_id' => 0,
@@ -240,7 +240,7 @@ it('removes cart items with missing product id', function (): void {
 it('rehydrates invalid cart item data object', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldReceive('exists')->andReturn(true);
     $product->shouldReceive('is_type')->andReturn(false);
     $product->shouldReceive('get_id')->andReturn(10);
@@ -268,7 +268,7 @@ it('removes variable product without variation', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
     $notice_called = false;
-    $variable_product = \Mockery::mock('WC_Product');
+    $variable_product = Mockery::mock('WC_Product');
     $variable_product->shouldReceive('exists')->andReturn(true);
     $variable_product->shouldReceive('is_type')->with('variable')->andReturn(true);
     $variable_product->shouldReceive('is_type')->with('variable-subscription')->andReturn(false);
@@ -301,7 +301,7 @@ it('removes missing variation product', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
     $notice_called = false;
-    $variable_product = \Mockery::mock('WC_Product');
+    $variable_product = Mockery::mock('WC_Product');
     $variable_product->shouldReceive('exists')->andReturn(true);
     $variable_product->shouldReceive('is_type')->with('variable')->andReturn(true);
     $variable_product->shouldReceive('is_type')->with('variable-subscription')->andReturn(false);
@@ -319,6 +319,7 @@ it('removes missing variation product', function (): void {
         if ($product_id === 10) {
             return $variable_product;
         }
+
         return null;
     });
     Functions\when('wc_add_notice')->alias(function () use (&$notice_called): void {
@@ -337,7 +338,7 @@ it('removes missing parent product', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
     $notice_called = false;
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldReceive('exists')->andReturn(true);
     $product->shouldReceive('is_type')->andReturn(false);
 
@@ -367,13 +368,13 @@ it('removes missing parent product', function (): void {
 it('rehydrates variation data object', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
-    $parent_product = \Mockery::mock('WC_Product');
+    $parent_product = Mockery::mock('WC_Product');
     $parent_product->shouldReceive('exists')->andReturn(true);
     $parent_product->shouldReceive('is_type')->with('variable')->andReturn(true);
     $parent_product->shouldReceive('is_type')->with('variable-subscription')->andReturn(false);
     $parent_product->shouldReceive('get_id')->andReturn(10);
 
-    $variation_product = \Mockery::mock('WC_Product');
+    $variation_product = Mockery::mock('WC_Product');
     $variation_product->shouldReceive('exists')->andReturn(true);
     $variation_product->shouldReceive('get_id')->andReturn(99);
 
@@ -392,6 +393,7 @@ it('rehydrates variation data object', function (): void {
         if ($product_id === 99) {
             return $variation_product;
         }
+
         return null;
     });
 
@@ -407,7 +409,7 @@ it('sets custom price when guest session active', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
     $price_set = false;
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldReceive('set_price')
         ->with(12.34)
         ->andReturnUsing(function () use (&$price_set): void {
@@ -434,7 +436,7 @@ it('sets custom price when guest session active', function (): void {
 it('skips custom price when no guest session', function (): void {
     unset($_COOKIE['wordpress_logged_in_order']);
 
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldNotReceive('set_price');
 
     $cart = new TestCart([
@@ -454,7 +456,7 @@ it('skips custom price when no guest session', function (): void {
 it('sets cart item custom price from session for guest', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldReceive('set_price')->with(9.99)->once();
 
     $cart_item = [
@@ -473,7 +475,7 @@ it('sets cart item custom price from session for guest', function (): void {
 it('skips cart item custom price without guest session', function (): void {
     unset($_COOKIE['wordpress_logged_in_order']);
 
-    $product = \Mockery::mock('WC_Product');
+    $product = Mockery::mock('WC_Product');
     $product->shouldNotReceive('set_price');
 
     $cart_item = [
@@ -504,7 +506,7 @@ it('skips cart item custom price for invalid data object', function (): void {
 });
 
 it('returns token data on successful initiate payment', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('has_status')->with('pending')->andReturn(true);
     $order->shouldReceive('get_customer_id')->andReturn(55);
 
@@ -512,7 +514,7 @@ it('returns token data on successful initiate payment', function (): void {
     Functions\when('is_email')->justReturn(true);
     Functions\when('get_userdata')->justReturn((object) ['ID' => 55]);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('generate_token')->andReturn('token-123');
     $core->shouldReceive('store_token_data')
         ->with(100, 'token-123', 55, 'guest@example.com', 'email')
@@ -528,7 +530,7 @@ it('returns token data on successful initiate payment', function (): void {
 });
 
 it('returns false when initiating payment with invalid email', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('has_status')->with('pending')->andReturn(true);
 
     Functions\when('wc_get_order')->justReturn($order);
@@ -538,7 +540,7 @@ it('returns false when initiating payment with invalid email', function (): void
 });
 
 it('returns false when initiating payment for non-pending order', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('has_status')->with('pending')->andReturn(false);
 
     Functions\when('wc_get_order')->justReturn($order);
@@ -548,7 +550,7 @@ it('returns false when initiating payment for non-pending order', function (): v
 });
 
 it('returns false when initiating payment for missing user', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('has_status')->with('pending')->andReturn(true);
     $order->shouldReceive('get_customer_id')->andReturn(0);
 
@@ -560,12 +562,12 @@ it('returns false when initiating payment for missing user', function (): void {
 });
 
 it('returns false when generating token with invalid email', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
 
     Functions\when('wc_get_order')->justReturn($order);
     Functions\when('is_email')->justReturn(false);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->andReturn(true);
 
     $result = $core->generate_token_for_order(100, 'invalid-email', 'manual');
@@ -574,14 +576,14 @@ it('returns false when generating token with invalid email', function (): void {
 });
 
 it('uses user meta user id when generating token', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->with('_wgp_guest_payment_user_id', true)->andReturn('77');
     $order->shouldReceive('get_customer_id')->andReturn(0);
 
     Functions\when('wc_get_order')->justReturn($order);
     Functions\when('is_email')->justReturn(true);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->andReturn(true);
     $core->shouldReceive('generate_token')->andReturn('token-456');
     $core->shouldReceive('store_token_data')
@@ -594,13 +596,13 @@ it('uses user meta user id when generating token', function (): void {
 });
 
 it('allows empty email for manual token generation', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->with('_wgp_guest_payment_user_id', true)->andReturn('');
     $order->shouldReceive('get_customer_id')->andReturn(44);
 
     Functions\when('wc_get_order')->justReturn($order);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->andReturn(true);
     $core->shouldReceive('generate_token')->andReturn('token-789');
     $core->shouldReceive('store_token_data')
@@ -613,14 +615,14 @@ it('allows empty email for manual token generation', function (): void {
 });
 
 it('returns false when token storage fails', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->with('_wgp_guest_payment_user_id', true)->andReturn('77');
     $order->shouldReceive('get_customer_id')->andReturn(0);
 
     Functions\when('wc_get_order')->justReturn($order);
     Functions\when('is_email')->justReturn(true);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->andReturn(true);
     $core->shouldReceive('generate_token')->andReturn('token-999');
     $core->shouldReceive('store_token_data')
@@ -635,7 +637,7 @@ it('returns false when token storage fails', function (): void {
 it('returns false when generating token with missing order', function (): void {
     Functions\when('wc_get_order')->justReturn(null);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->andReturn(true);
 
     $result = $core->generate_token_for_order(100, 'guest@example.com', 'manual');
@@ -652,7 +654,7 @@ it('returns false when initiating payment with missing order', function (): void
 it('returns early when handling payment completion with missing order', function (): void {
     Functions\when('wc_get_order')->justReturn(null);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldNotReceive('invalidate_token_for_order');
 
     $core->handle_payment_completion(100);
@@ -661,12 +663,12 @@ it('returns early when handling payment completion with missing order', function
 });
 
 it('invalidates token when handling payment completion', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_user_id')->andReturn(55);
 
     Functions\when('wc_get_order')->justReturn($order);
 
-    $core = \Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
+    $core = Mockery::mock(WicketGuestPaymentCore::class)->makePartial();
     $core->shouldReceive('invalidate_token_for_order')->with(100)->once();
 
     $core->handle_payment_completion(100);
@@ -675,7 +677,7 @@ it('invalidates token when handling payment completion', function (): void {
 });
 
 it('removes token meta when present', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('meta_exists')->with('_wgp_guest_payment_token_hash')->andReturn(true);
     $order->shouldReceive('meta_exists')->with('_wgp_guest_payment_token_encrypted')->andReturn(true);
     $order->shouldReceive('meta_exists')->with('_wgp_guest_payment_token_created')->andReturn(true);
@@ -686,12 +688,13 @@ it('removes token meta when present', function (): void {
     $order->shouldReceive('save')->andReturn(true);
     $order->shouldReceive('get_user_id')->andReturn(0);
 
-    $order_after = \Mockery::mock('WC_Order');
+    $order_after = Mockery::mock('WC_Order');
     $order_after->shouldReceive('meta_exists')->andReturn(false);
 
     $call_count = 0;
     Functions\when('wc_get_order')->alias(function () use ($order, $order_after, &$call_count) {
         $call_count++;
+
         return $call_count === 1 ? $order : $order_after;
     });
 
@@ -701,39 +704,43 @@ it('removes token meta when present', function (): void {
 });
 
 it('cleans up secure cart data for user when invalidating token', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('meta_exists')->andReturn(true);
     $order->shouldReceive('delete_meta_data')->andReturnNull();
     $order->shouldReceive('save')->andReturn(true);
     $order->shouldReceive('get_user_id')->andReturn(55);
 
-    $order_after = \Mockery::mock('WC_Order');
+    $order_after = Mockery::mock('WC_Order');
     $order_after->shouldReceive('meta_exists')->andReturn(false);
 
     $call_count = 0;
     Functions\when('wc_get_order')->alias(function () use ($order, $order_after, &$call_count) {
         $call_count++;
+
         return $call_count === 1 ? $order : $order_after;
     });
 
     $original_wpdb = $GLOBALS['wpdb'];
     $GLOBALS['wpdb'] = new class {
         public $options = 'wp_options';
+
         public function get_col($query): array
         {
             return ['_transient_wgp_map_key_one', '_transient_wgp_map_key_two'];
         }
+
         public function prepare($query, ...$args): string
         {
             return $query;
         }
+
         public function esc_like($text): string
         {
             return addcslashes($text, '_%\\');
         }
     };
 
-    $plugin = \Mockery::mock('WicketGuestPayment');
+    $plugin = Mockery::mock('WicketGuestPayment');
     $plugin->shouldReceive('delete_secure_cart_data')->with('key_one')->once()->andReturn(true);
     $plugin->shouldReceive('delete_secure_cart_data')->with('key_two')->once()->andReturn(true);
 
@@ -792,9 +799,10 @@ it('removes cart validation actions for guest', function (): void {
 
     $session = new class {};
 
-    $mockWC = new class ($cart, $session) {
+    $mockWC = new class($cart, $session) {
         public $cart;
         public $session;
+
         public function __construct($cart, $session)
         {
             $this->cart = $cart;
@@ -815,7 +823,7 @@ it('removes cart validation actions for guest', function (): void {
 });
 
 it('returns null when token missing', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => '',
@@ -832,7 +840,7 @@ it('returns null when token missing', function (): void {
 });
 
 it('returns null when token decrypt fails', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => 'not-base64',
@@ -853,7 +861,7 @@ it('defaults generation method to email', function (): void {
     $encrypted = wgp_core_unit_encrypt_token_for_test($token);
     $created_timestamp = time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) use ($encrypted, $created_timestamp) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => $encrypted,
@@ -902,7 +910,7 @@ it('returns data when token valid', function (): void {
     $encrypted = wgp_core_unit_encrypt_token_for_test($token);
     $created_timestamp = time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) use ($encrypted, $created_timestamp) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => $encrypted,
@@ -928,7 +936,7 @@ it('returns null when user id missing', function (): void {
     $token = 'valid-token';
     $encrypted = wgp_core_unit_encrypt_token_for_test($token);
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_meta')->andReturnUsing(function (string $key) use ($encrypted) {
         return match ($key) {
             '_wgp_guest_payment_token_encrypted' => $encrypted,
@@ -946,7 +954,7 @@ it('returns null when user id missing', function (): void {
 });
 
 it('returns true when no token data exists', function (): void {
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('meta_exists')->andReturn(false);
     $order->shouldNotReceive('save');
 

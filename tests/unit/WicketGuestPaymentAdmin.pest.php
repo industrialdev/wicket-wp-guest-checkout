@@ -136,10 +136,12 @@ it('generates a manual link for valid requests', function (): void {
         {
             return '';
         }
+
         public function get_customer_id(): int
         {
             return 55;
         }
+
         public function add_order_note(string $note): void {}
     };
 
@@ -248,6 +250,7 @@ it('generates and sends a link via ajax', function (): void {
         {
             return 77;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return '';

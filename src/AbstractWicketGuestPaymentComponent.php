@@ -18,7 +18,7 @@ defined('ABSPATH') || exit;
  */
 abstract class AbstractWicketGuestPaymentComponent
 {
-    use WicketGuestPaymentLogger;
+    use TraitWicketGuestPaymentLogger;
 
     /**
      * Get main plugin instance.

@@ -77,3 +77,4 @@ if (!defined('PHPUNIT_COMPOSER_INSTALL')) {
 }
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/src/WicketGuestPaymentAdminPay.php';

@@ -18,6 +18,7 @@ it('returns true when email integration option enabled', function (): void {
         if ($name === 'wicket_guest_payment_enable_email_integration') {
             return 'yes';
         }
+
         return $default;
     });
 
@@ -39,6 +40,7 @@ it('returns true when pdf integration option enabled', function (): void {
         if ($name === 'wicket_guest_payment_enable_pdf_integration') {
             return 'on';
         }
+
         return $default;
     });
 
@@ -52,6 +54,7 @@ it('uses configured token expiry days when set', function (): void {
         if ($name === 'wicket_guest_payment_token_expiry_days') {
             return 14;
         }
+
         return $default;
     });
 
@@ -62,7 +65,7 @@ it('prepends settings link in plugin action links', function (): void {
     $config = new WicketGuestPaymentConfig();
 
     Monkey\Functions\when('admin_url')->justReturn('https://example.com/wp-admin/admin.php');
-    Monkey\Functions\when('esc_url')->alias(fn(string $url) => $url);
+    Monkey\Functions\when('esc_url')->alias(fn (string $url) => $url);
     Monkey\Functions\when('esc_html__')->justReturn('Settings');
 
     if (!defined('WICKET_GUEST_CHECKOUT_BASENAME')) {
@@ -78,7 +81,7 @@ it('prepends settings link in plugin action links', function (): void {
 it('returns error for invalid configuration days', function (): void {
     $config = new WicketGuestPaymentConfig();
 
-    Monkey\Functions\when('rest_sanitize_boolean')->alias(fn($value) => (bool) $value);
+    Monkey\Functions\when('rest_sanitize_boolean')->alias(fn ($value) => (bool) $value);
 
     $result = $config->validate_configuration([
         'email_integration' => true,
@@ -92,8 +95,8 @@ it('returns error for invalid configuration days', function (): void {
 it('updates options when saving configuration', function (): void {
     $config = new WicketGuestPaymentConfig();
 
-    Monkey\Functions\when('rest_sanitize_boolean')->alias(fn($value) => (bool) $value);
-    Monkey\Functions\when('is_wp_error')->alias(fn($value) => $value instanceof WP_Error);
+    Monkey\Functions\when('rest_sanitize_boolean')->alias(fn ($value) => (bool) $value);
+    Monkey\Functions\when('is_wp_error')->alias(fn ($value) => $value instanceof WP_Error);
     Monkey\Functions\when('update_option')->justReturn(true);
 
     $result = $config->save_configuration([

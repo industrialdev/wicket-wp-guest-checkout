@@ -28,6 +28,7 @@ function wgp_email_mock_order(): object
         {
             return 1;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             return '';
@@ -42,11 +43,13 @@ function wgp_email_mock_order_with_guest_email(): object
         {
             return 1;
         }
+
         public function get_meta(string $key, bool $single = false)
         {
             if ($key === '_wgp_guest_payment_email') {
                 return 'guest@example.com';
             }
+
             return '';
         }
     };
@@ -59,18 +62,22 @@ function wgp_email_mock_order_with_methods(): object
         {
             return 1;
         }
+
         public function get_order_number(): string
         {
             return '12345';
         }
+
         public function get_formatted_order_total(): string
         {
             return '$100.00';
         }
+
         public function get_items(): array
         {
             return [];
         }
+
         public function add_order_note(string $note, bool $is_error = false): void {}
     };
 }

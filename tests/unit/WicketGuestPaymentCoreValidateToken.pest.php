@@ -24,6 +24,7 @@ it('returns false when encryption key missing', function (): void {
 
     if (defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
         expect(true)->toBeTrue();
+
         return;
     }
 
@@ -49,7 +50,7 @@ it('validates token and returns order', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('pending');
     $order->shouldReceive('has_status')->andReturn(true);
@@ -60,6 +61,7 @@ it('validates token and returns order', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -83,7 +85,7 @@ it('returns false for expired token', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) (time() - (8 * DAY_IN_SECONDS));
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('pending');
     $order->shouldReceive('has_status')->andReturn(true);
@@ -94,6 +96,7 @@ it('returns false for expired token', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -114,7 +117,7 @@ it('returns false for tampered token', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($original_token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('pending');
     $order->shouldReceive('has_status')->andReturn(true);
@@ -125,6 +128,7 @@ it('returns false for tampered token', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -144,10 +148,10 @@ it('accepts failed status orders', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('failed');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('failed', $statuses, true);
         });
@@ -158,6 +162,7 @@ it('accepts failed status orders', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -177,10 +182,10 @@ it('accepts on-hold status orders', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('on-hold');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('on-hold', $statuses, true);
         });
@@ -191,6 +196,7 @@ it('accepts on-hold status orders', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -217,10 +223,10 @@ it('rejects completed status orders', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('completed');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('completed', $statuses, true);
         });
@@ -231,6 +237,7 @@ it('rejects completed status orders', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -276,7 +283,7 @@ it('returns false when token timestamp missing', function (): void {
 
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('pending');
     $order->shouldReceive('has_status')->andReturn(true);
@@ -287,6 +294,7 @@ it('returns false when token timestamp missing', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return '';
         }
+
         return null;
     });
 
@@ -313,10 +321,10 @@ it('accepts active subscription status', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('active');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('active', $statuses, true);
         });
@@ -327,6 +335,7 @@ it('accepts active subscription status', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -356,10 +365,10 @@ it('rejects tampered subscription token', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('active');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('active', $statuses, true);
         });
@@ -370,6 +379,7 @@ it('rejects tampered subscription token', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -398,10 +408,10 @@ it('rejects subscription with non-allowed status', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('cancelled');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('cancelled', $statuses, true);
         });
@@ -412,6 +422,7 @@ it('rejects subscription with non-allowed status', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -440,10 +451,10 @@ it('allows custom order status via filter', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('custom-status');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('custom-status', $statuses, true);
         });
@@ -454,6 +465,7 @@ it('allows custom order status via filter', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -461,6 +473,7 @@ it('allows custom order status via filter', function (): void {
         if ($filter === 'wicket_guest_payment_allowed_order_statuses') {
             $value[] = 'custom-status';
         }
+
         return $value;
     });
     Functions\when('wcs_get_subscriptions')->justReturn([]);
@@ -487,10 +500,10 @@ it('allows custom subscription status via filter', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('custom-sub-status');
-    $order->shouldReceive('has_status')->with(\Mockery::type('array'))
+    $order->shouldReceive('has_status')->with(Mockery::type('array'))
         ->andReturnUsing(function ($statuses) {
             return in_array('custom-sub-status', $statuses, true);
         });
@@ -501,6 +514,7 @@ it('allows custom subscription status via filter', function (): void {
         if ($key === '_wgp_guest_payment_token_created') {
             return $created_time;
         }
+
         return null;
     });
 
@@ -508,6 +522,7 @@ it('allows custom subscription status via filter', function (): void {
         if ($filter === 'wicket_guest_payment_allowed_subscription_statuses') {
             $value[] = 'custom-sub-status';
         }
+
         return $value;
     });
     Functions\when('wcs_get_subscriptions')->alias(function () {

@@ -80,7 +80,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
             // Validate product data object exists
-            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
+            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof WC_Product)) {
                 continue;
             }
 
@@ -113,7 +113,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         // Validate product data object exists
-        if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
+        if (!isset($cart_item['data']) || !($cart_item['data'] instanceof WC_Product)) {
             return $cart_item;
         }
 
@@ -237,7 +237,6 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // Clear the current user's cart to ensure only the order items are present
         WC()->cart->empty_cart(true);
-
 
         // Add the order items to the cart
         $items_added = false;
@@ -1017,6 +1016,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     public function get_token_expiry_timestamp(?int $created_timestamp = null): int
     {
         $base_time = $created_timestamp ?? time();
+
         return $base_time + ($this->token_expiry_days * DAY_IN_SECONDS);
     }
 
@@ -1338,7 +1338,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             }
 
             // 2. Validate data object exists first
-            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof \WC_Product)) {
+            if (!isset($cart_item['data']) || !($cart_item['data'] instanceof WC_Product)) {
                 $this->log(
                     sprintf('Guard: Cart item %s has invalid data object. Type: %s', $cart_item_key, isset($cart_item['data']) ? gettype($cart_item['data']) : 'not set'),
                     'warning'
