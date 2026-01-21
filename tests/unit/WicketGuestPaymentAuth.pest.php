@@ -32,7 +32,7 @@ it('constructs with core dependency', function (): void {
 });
 
 it('registers hooks during init', function (): void {
-    $core = \Mockery::mock(WicketGuestPaymentCore::class);
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
     $auth = new WicketGuestPaymentAuth($core);
 
     $auth->init_hooks();
@@ -66,7 +66,7 @@ it('returns original admin bar value when no guest session', function (): void {
 it('reuses original order id when guest session active', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
-    $mockOrder = new class (456, 123) {
+    $mockOrder = new class(456, 123) {
         private $orderId;
         private $userId;
 
@@ -80,26 +80,33 @@ it('reuses original order id when guest session active', function (): void {
         {
             return $this->orderId;
         }
+
         public function get_user_id(): int
         {
             return $this->userId;
         }
+
         public function get_status(): string
         {
             return 'pending';
         }
+
         public function has_status($statuses): bool
         {
             if (is_array($statuses)) {
                 return in_array('pending', $statuses, true);
             }
+
             return $this->get_status() === $statuses;
         }
+
         public function get_cart_hash(): string
         {
             return 'test_hash';
         }
+
         public function set_cart_hash(string $hash): void {}
+
         public function save(): int
         {
             return $this->orderId;
@@ -117,8 +124,9 @@ it('reuses original order id when guest session active', function (): void {
         }
     };
 
-    $mockWC = new class ($mockCart) {
+    $mockWC = new class($mockCart) {
         public $cart;
+
         public function __construct($cart)
         {
             $this->cart = $cart;
@@ -127,7 +135,7 @@ it('reuses original order id when guest session active', function (): void {
 
     Monkey\Functions\when('WC')->justReturn($mockWC);
 
-    $checkout = \Mockery::mock('WC_Checkout');
+    $checkout = Mockery::mock('WC_Checkout');
 
     $result = $this->auth->force_reuse_guest_payment_order(null, $checkout);
 
@@ -141,7 +149,7 @@ it('returns provided order id when no guest session', function (): void {
 
     Monkey\Functions\when('get_current_user_id')->justReturn(0);
 
-    $checkout = \Mockery::mock('WC_Checkout');
+    $checkout = Mockery::mock('WC_Checkout');
 
     $result = $this->auth->force_reuse_guest_payment_order(789, $checkout);
 
@@ -154,7 +162,7 @@ it('returns zero when original order id missing', function (): void {
     Monkey\Functions\when('get_current_user_id')->justReturn(123);
     Monkey\Functions\when('get_user_meta')->justReturn('');
 
-    $checkout = \Mockery::mock('WC_Checkout');
+    $checkout = Mockery::mock('WC_Checkout');
 
     $result = $this->auth->force_reuse_guest_payment_order(null, $checkout);
 
@@ -195,16 +203,17 @@ it('blocks checkout on session mismatch', function (): void {
 
     $notice_called = false;
 
-    $cart = \Mockery::mock();
+    $cart = Mockery::mock();
     $cart->shouldReceive('empty_cart')->once();
 
-    $session = \Mockery::mock();
+    $session = Mockery::mock();
     $session->shouldReceive('get')->with('order_awaiting_payment')->andReturn(999);
     $session->shouldReceive('set')->with('order_awaiting_payment', null)->once();
 
-    $mockWC = new class ($cart, $session) {
+    $mockWC = new class($cart, $session) {
         public $cart;
         public $session;
+
         public function __construct($cart, $session)
         {
             $this->cart = $cart;
@@ -229,19 +238,20 @@ it('blocks checkout on session mismatch', function (): void {
 it('allows checkout for valid order', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
-    $cart = \Mockery::mock();
+    $cart = Mockery::mock();
     $cart->shouldNotReceive('empty_cart');
 
-    $session = \Mockery::mock();
+    $session = Mockery::mock();
     $session->shouldReceive('get')->with('order_awaiting_payment')->andReturn('123');
     $session->shouldNotReceive('set');
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('has_status')->with(['pending', 'failed', 'on-hold'])->andReturn(true);
 
-    $mockWC = new class ($cart, $session) {
+    $mockWC = new class($cart, $session) {
         public $cart;
         public $session;
+
         public function __construct($cart, $session)
         {
             $this->cart = $cart;
@@ -267,16 +277,17 @@ it('blocks checkout when order missing', function (): void {
 
     $notice_called = false;
 
-    $cart = \Mockery::mock();
+    $cart = Mockery::mock();
     $cart->shouldReceive('empty_cart')->once();
 
-    $session = \Mockery::mock();
+    $session = Mockery::mock();
     $session->shouldReceive('get')->with('order_awaiting_payment')->andReturn('123');
     $session->shouldReceive('set')->with('order_awaiting_payment', null)->once();
 
-    $mockWC = new class ($cart, $session) {
+    $mockWC = new class($cart, $session) {
         public $cart;
         public $session;
+
         public function __construct($cart, $session)
         {
             $this->cart = $cart;
@@ -350,12 +361,12 @@ it('blocks payment block on order mismatch', function (): void {
 
     $error_called = false;
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(999);
 
-    $errors = \Mockery::mock('WP_Error');
+    $errors = Mockery::mock('WP_Error');
     $errors->shouldReceive('add')
-        ->with('guest_payment_order_mismatch', \Mockery::type('string'))
+        ->with('guest_payment_order_mismatch', Mockery::type('string'))
         ->andReturnUsing(function () use (&$error_called): void {
             $error_called = true;
         })
@@ -376,14 +387,14 @@ it('blocks payment block on invalid status', function (): void {
 
     $error_called = false;
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('has_status')->with(['pending', 'failed', 'on-hold'])->andReturn(false);
     $order->shouldReceive('get_status')->andReturn('completed');
 
-    $errors = \Mockery::mock('WP_Error');
+    $errors = Mockery::mock('WP_Error');
     $errors->shouldReceive('add')
-        ->with('guest_payment_order_status', \Mockery::type('string'))
+        ->with('guest_payment_order_status', Mockery::type('string'))
         ->andReturnUsing(function () use (&$error_called): void {
             $error_called = true;
         })
@@ -402,8 +413,8 @@ it('blocks payment block on invalid status', function (): void {
 it('returns early when no guest session cookie before payment block', function (): void {
     unset($_COOKIE['wordpress_logged_in_order']);
 
-    $order = \Mockery::mock('WC_Order');
-    $errors = \Mockery::mock('WP_Error');
+    $order = Mockery::mock('WC_Order');
+    $errors = Mockery::mock('WP_Error');
     $errors->shouldNotReceive('add');
 
     $this->auth->validate_guest_payment_order_before_payment_block($order, $errors);
@@ -416,12 +427,12 @@ it('adds error when user missing before payment block', function (): void {
 
     $error_called = false;
 
-    $order = \Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Order');
     $order->shouldNotReceive('get_id');
 
-    $errors = \Mockery::mock('WP_Error');
+    $errors = Mockery::mock('WP_Error');
     $errors->shouldReceive('add')
-        ->with('guest_payment_session_error', \Mockery::type('string'))
+        ->with('guest_payment_session_error', Mockery::type('string'))
         ->andReturnUsing(function () use (&$error_called): void {
             $error_called = true;
         })
@@ -443,6 +454,7 @@ it('skips cart restore when not on cart or checkout', function (): void {
     Monkey\Functions\when('is_checkout')->justReturn(false);
     Monkey\Functions\when('get_transient')->alias(function () use (&$get_transient_called) {
         $get_transient_called = true;
+
         return false;
     });
 
@@ -456,14 +468,15 @@ it('deletes transients when cart not empty', function (): void {
 
     $delete_count = 0;
 
-    $cart = \Mockery::mock();
+    $cart = Mockery::mock();
     $cart->shouldReceive('is_empty')->andReturn(false);
 
-    $session = \Mockery::mock();
+    $session = Mockery::mock();
 
-    $mockWC = new class ($cart, $session) {
+    $mockWC = new class($cart, $session) {
         public $cart;
         public $session;
+
         public function __construct($cart, $session)
         {
             $this->cart = $cart;
@@ -488,10 +501,12 @@ it('deletes transients when cart not empty', function (): void {
         if ($key === 'wgp_map_secure-key') {
             return 123;
         }
+
         return false;
     });
     Monkey\Functions\when('delete_transient')->alias(function () use (&$delete_count): bool {
         $delete_count++;
+
         return true;
     });
 
@@ -513,6 +528,7 @@ it('skips cart restore when transient missing', function (): void {
     Monkey\Functions\when('get_transient')->justReturn(false);
     Monkey\Functions\when('delete_transient')->alias(function () use (&$delete_count): bool {
         $delete_count++;
+
         return true;
     });
 
@@ -532,6 +548,7 @@ it('skips cart restore when cart key empty', function (): void {
     Monkey\Functions\when('is_checkout')->justReturn(false);
     Monkey\Functions\when('get_transient')->alias(function () use (&$get_transient_called) {
         $get_transient_called = true;
+
         return false;
     });
 
@@ -553,6 +570,7 @@ it('skips cart restore when transient not array', function (): void {
     Monkey\Functions\when('get_transient')->justReturn('not-an-array');
     Monkey\Functions\when('delete_transient')->alias(function () use (&$delete_called): bool {
         $delete_called = true;
+
         return true;
     });
 
@@ -604,6 +622,7 @@ it('returns early on wp-login page', function (): void {
     Monkey\Functions\when('is_admin')->returnArg();
     Monkey\Functions\when('is_user_logged_in')->alias(function () use (&$called): bool {
         $called = true;
+
         return false;
     });
 
@@ -657,7 +676,7 @@ it('allows checkout for guest session', function (): void {
 });
 
 it('cleans up after payment for guest sessions', function (): void {
-    $core = \Mockery::mock(WicketGuestPaymentCore::class);
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
     $core->shouldReceive('invalidate_token_for_order')
         ->once()
         ->with(123);
@@ -671,7 +690,9 @@ it('cleans up after payment for guest sessions', function (): void {
         {
             return 99;
         }
+
         public function add_order_note(string $note): void {}
+
         public function save(): int
         {
             return 555;
@@ -924,7 +945,7 @@ it('noops when no error params present', function (): void {
 });
 
 it('redirects guest users away from wp-admin', function (): void {
-    $core = \Mockery::mock(WicketGuestPaymentCore::class);
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
     $auth = new WicketGuestPaymentAuth($core);
 
     $_COOKIE['wordpress_logged_in_order'] = '1';

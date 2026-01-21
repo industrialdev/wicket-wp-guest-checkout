@@ -38,9 +38,9 @@ function wgp_with_cookie(array $cookie, callable $callback): void
 it('blocks admin pay when user is not admin', function (): void {
     $handler = new WicketGuestPaymentAdminPay();
 
-    Monkey\Functions\when('absint')->alias(static fn($value) => (int) $value);
-    Monkey\Functions\when('sanitize_key')->alias(static fn($value) => $value);
-    Monkey\Functions\when('wp_unslash')->alias(static fn($value) => $value);
+    Monkey\Functions\when('absint')->alias(static fn ($value) => (int) $value);
+    Monkey\Functions\when('sanitize_key')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('wp_unslash')->alias(static fn ($value) => $value);
     Monkey\Functions\when('get_current_user_id')->justReturn(11);
     Monkey\Functions\when('get_userdata')->justReturn((object) ['roles' => ['shop_manager']]);
 
@@ -85,9 +85,9 @@ it('starts admin pay session for valid admin', function (): void {
         public function add_order_note(string $note): void {}
     };
 
-    Monkey\Functions\when('absint')->alias(static fn($value) => (int) $value);
-    Monkey\Functions\when('sanitize_key')->alias(static fn($value) => $value);
-    Monkey\Functions\when('wp_unslash')->alias(static fn($value) => $value);
+    Monkey\Functions\when('absint')->alias(static fn ($value) => (int) $value);
+    Monkey\Functions\when('sanitize_key')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('wp_unslash')->alias(static fn ($value) => $value);
     Monkey\Functions\when('get_current_user_id')->justReturn(99);
     Monkey\Functions\when('get_userdata')->justReturn((object) [
         'roles' => ['administrator'],
@@ -99,7 +99,7 @@ it('starts admin pay session for valid admin', function (): void {
     Monkey\Functions\expect('set_transient')
         ->once()
         ->with(
-            Mockery::on(static fn($key): bool => str_starts_with($key, 'wgp_admin_pay_')),
+            Mockery::on(static fn ($key): bool => str_starts_with($key, 'wgp_admin_pay_')),
             Mockery::on(static function ($data): bool {
                 return is_array($data)
                     && $data['admin_id'] === 99
@@ -132,9 +132,9 @@ it('auto returns admin on thank you page', function (): void {
         public function add_order_note(string $note): void {}
     };
 
-    Monkey\Functions\when('sanitize_key')->alias(static fn($value) => $value);
-    Monkey\Functions\when('wp_unslash')->alias(static fn($value) => $value);
-    Monkey\Functions\when('absint')->alias(static fn($value) => (int) $value);
+    Monkey\Functions\when('sanitize_key')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('wp_unslash')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('absint')->alias(static fn ($value) => (int) $value);
     Monkey\Functions\when('get_current_user_id')->justReturn(55);
     Monkey\Functions\when('get_userdata')->justReturn((object) [
         'roles' => ['administrator'],

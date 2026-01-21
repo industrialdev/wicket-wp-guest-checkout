@@ -1073,7 +1073,6 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
     }
 
-
     /**
      * Get the user's IP address, handling proxies.
      *

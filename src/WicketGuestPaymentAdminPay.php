@@ -160,6 +160,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $token = $data['_token'] ?? '';
         if (!$token) {
             $this->clear_admin_pay_cookies();
+
             return;
         }
 
@@ -177,6 +178,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $admin_id = isset($data['admin_id']) ? (int) $data['admin_id'] : 0;
         if (!$admin_id || !$this->is_admin_user($admin_id)) {
             $this->clear_admin_pay_cookies();
+
             return;
         }
 
@@ -378,6 +380,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             return bin2hex(random_bytes(16));
         } catch (Exception $exception) {
             $this->log(sprintf('Admin pay token generation failed: %s', $exception->getMessage()), 'error');
+
             return '';
         }
     }

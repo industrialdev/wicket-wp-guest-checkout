@@ -11,4 +11,3 @@ $testSuite->configure(
     namespace: 'Wicket\\GuestPayment\\Tests',
     source: 'src'
 );
-

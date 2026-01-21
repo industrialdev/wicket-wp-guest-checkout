@@ -69,7 +69,7 @@ function wicket_browser_options(array $overrides = []): array
 /**
  * @param array<string, mixed> $options
  */
-function wicket_browser_visit(array|string $url, array $options = []): \Pest\Browser\Api\ArrayablePendingAwaitablePage|\Pest\Browser\Api\PendingAwaitablePage
+function wicket_browser_visit(array|string $url, array $options = []): Pest\Browser\Api\ArrayablePendingAwaitablePage|Pest\Browser\Api\PendingAwaitablePage
 {
     return visit($url, wicket_browser_options($options));
 }

@@ -1,7 +1,7 @@
 {
     "name": "industrialdev/wicket-wp-guest-checkout",
     "description": "Wicket Guest Checkout - Secure guest payment system for WooCommerce",
-    "version": "1.1.2",
+    "version": "1.2.0",
     "type": "wordpress-plugin",
     "keywords": [
         "wordpress",
