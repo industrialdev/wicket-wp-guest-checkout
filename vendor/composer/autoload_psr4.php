@@ -7,5 +7,5 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'Wicket\\GuestPayment\\' => array($baseDir . '/src'),
-    'Composer\\Installers\\' => array($vendorDir . '/composer/installers/src/Composer/Installers'),
+    'HyperFields\\' => array($vendorDir . '/estebanforge/hyperfields/src'),
 );

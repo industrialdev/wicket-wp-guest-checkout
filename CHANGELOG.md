@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Admin-only "Pay For Customer" impersonation flow with automatic return after payment
+- Modular Woo tweaks system with Hyperfields settings submenu under Wicket and admin email blocker module
 
 ### Planned
 - Settings page in WooCommerce admin
