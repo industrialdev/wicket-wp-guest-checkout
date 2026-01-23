@@ -4,59 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a4e8b28c0866b5883bce3a6ab9d2416f",
-    "packages": [
-        {
-            "name": "estebanforge/hyperfields",
-            "version": "1.0.8",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/EstebanForge/HyperFields.git",
-                "reference": "3d78f7dbe1bb9378b7be7e10a29d415ed26f724d"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/EstebanForge/HyperFields/zipball/3d78f7dbe1bb9378b7be7e10a29d415ed26f724d",
-                "reference": "3d78f7dbe1bb9378b7be7e10a29d415ed26f724d",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.1"
-            },
-            "require-dev": {
-                "brain/monkey": "^2.6",
-                "mockery/mockery": "^1.6",
-                "phpunit/phpunit": "^11.0"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "includes/helpers.php",
-                    "includes/backward-compatibility.php",
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "HyperFields\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "GPL-2.0-or-later"
-            ],
-            "authors": [
-                {
-                    "name": "Esteban Cuevas",
-                    "email": "esteban@actitud.xyz"
-                }
-            ],
-            "description": "HyperFields: A powerful custom field system for WordPress, providing metaboxes, options pages, and conditional logic.",
-            "support": {
-                "issues": "https://github.com/EstebanForge/HyperFields/issues",
-                "source": "https://github.com/EstebanForge/HyperFields/tree/1.0.8"
-            },
-            "time": "2026-01-21T19:15:03+00:00"
-        }
-    ],
+    "content-hash": "8c3146efae893353ecf57acdc3aa2c56",
+    "packages": [],
     "packages-dev": [
         {
             "name": "amphp/amp",

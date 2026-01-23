@@ -126,20 +126,6 @@ class WicketGuestPayment
     private $receipt;
 
     /**
-     * Modules settings instance.
-     *
-     * @var WicketGuestPaymentModulesSettings|null
-     */
-    private $modules_settings;
-
-    /**
-     * Modules loader instance.
-     *
-     * @var WicketGuestPaymentModules|null
-     */
-    private $modules;
-
-    /**
      * Singleton instance.
      *
      * @var Wicket_Guest_Payment
@@ -233,13 +219,6 @@ class WicketGuestPayment
         // Initialize configuration
         $this->config = new WicketGuestPaymentConfig();
         $this->config->init();
-
-        // Initialize modular Woo tweaks settings and modules
-        $this->modules_settings = new WicketGuestPaymentModulesSettings();
-        $this->modules_settings->init();
-
-        $this->modules = new WicketGuestPaymentModules($this->modules_settings);
-        $this->modules->init();
 
         // Initialize email functionality
         $this->email = new WicketGuestPaymentEmail($this->core);
