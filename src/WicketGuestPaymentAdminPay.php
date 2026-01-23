@@ -366,12 +366,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             return false;
         }
 
-        $user = get_userdata($user_id);
-        if (!$user || empty($user->roles) || !is_array($user->roles)) {
-            return false;
-        }
-
-        return in_array('administrator', $user->roles, true);
+        return user_can($user_id, 'manage_woocommerce') || user_can($user_id, 'manage_options');
     }
 
     private function generate_token(): string

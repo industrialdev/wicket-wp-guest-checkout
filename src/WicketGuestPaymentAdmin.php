@@ -340,12 +340,7 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
 
     private function current_user_is_admin(): bool
     {
-        $user = wp_get_current_user();
-        if (!$user || empty($user->roles) || !is_array($user->roles)) {
-            return false;
-        }
-
-        return in_array('administrator', $user->roles, true);
+        return current_user_can('manage_woocommerce') || current_user_can('manage_options');
     }
 
     /**

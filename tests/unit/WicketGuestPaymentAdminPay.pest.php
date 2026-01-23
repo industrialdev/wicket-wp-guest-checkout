@@ -43,6 +43,7 @@ it('blocks admin pay when user is not admin', function (): void {
     Monkey\Functions\when('wp_unslash')->alias(static fn ($value) => $value);
     Monkey\Functions\when('get_current_user_id')->justReturn(11);
     Monkey\Functions\when('get_userdata')->justReturn((object) ['roles' => ['shop_manager']]);
+    Monkey\Functions\when('user_can')->alias(static fn (): bool => false);
 
     Monkey\Functions\expect('wp_die')
         ->once()
@@ -93,6 +94,7 @@ it('starts admin pay session for valid admin', function (): void {
         'roles' => ['administrator'],
         'display_name' => 'Admin User',
     ]);
+    Monkey\Functions\when('user_can')->alias(static fn (int $user_id, string $capability): bool => $user_id === 99);
 
     Monkey\Functions\expect('check_admin_referer')->once();
     Monkey\Functions\when('wc_get_order')->justReturn($order);
@@ -140,6 +142,7 @@ it('auto returns admin on thank you page', function (): void {
         'roles' => ['administrator'],
         'display_name' => 'Admin User',
     ]);
+    Monkey\Functions\when('user_can')->alias(static fn (int $user_id, string $capability): bool => $user_id === 99);
     Monkey\Functions\when('wc_get_order')->justReturn($order);
 
     Monkey\Functions\expect('get_transient')

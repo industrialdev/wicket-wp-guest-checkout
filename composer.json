@@ -45,7 +45,8 @@
         }
     },
     "scripts": {
-        "production": "composer dump-autoload --optimize --no-dev",
+        "production": "rm -rf vendor && composer install --no-dev --optimize-autoloader",
+        "setup-hooks": "mkdir -p .git/hooks && cp .ci/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo 'Git hooks installed to .git/hooks/pre-push'",
         "test": "pest",
         "test:unit": "pest --testsuite unit",
         "test:coverage": "pest --coverage-html coverage",

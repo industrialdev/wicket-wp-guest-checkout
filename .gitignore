@@ -45,3 +45,4 @@ tmp/
 *~
 .php-cs-fixer.cache
 /reference-repo-tests
+/.construct-clipboard

@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01
+class ComposerStaticInita4e8b28c0866b5883bce3a6ab9d2416f
 {
     public static $files = array (
         '13f65e44352b0407f05cb5a5e174612b' => __DIR__ . '/..' . '/estebanforge/hyperfields/includes/helpers.php',
@@ -37,6 +37,34 @@ class ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01
     public static $classMap = array (
         'AbstractWicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/AbstractWicketGuestPaymentComponent.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'HyperFields\\Admin\\Activation' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/Activation.php',
+        'HyperFields\\Admin\\Options' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/Options.php',
+        'HyperFields\\Admin\\OptionsMigration' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Admin/OptionsMigration.php',
+        'HyperFields\\Assets' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Assets.php',
+        'HyperFields\\BlockFieldAdapter' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/BlockFieldAdapter.php',
+        'HyperFields\\ConditionalLogic' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/ConditionalLogic.php',
+        'HyperFields\\Container\\Container' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/Container.php',
+        'HyperFields\\Container\\ContainerFactory' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/ContainerFactory.php',
+        'HyperFields\\Container\\PostMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/PostMetaContainer.php',
+        'HyperFields\\Container\\TermMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/TermMetaContainer.php',
+        'HyperFields\\Container\\UserMetaContainer' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Container/UserMetaContainer.php',
+        'HyperFields\\CustomField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/CustomField.php',
+        'HyperFields\\Field' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Field.php',
+        'HyperFields\\HeadingField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/HeadingField.php',
+        'HyperFields\\HyperFields' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/HyperFields.php',
+        'HyperFields\\LibraryBootstrap' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/LibraryBootstrap.php',
+        'HyperFields\\Log' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Log.php',
+        'HyperFields\\OptionField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionField.php',
+        'HyperFields\\OptionsPage' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionsPage.php',
+        'HyperFields\\OptionsSection' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/OptionsSection.php',
+        'HyperFields\\PostField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/PostField.php',
+        'HyperFields\\Registry' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/Registry.php',
+        'HyperFields\\RepeaterField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/RepeaterField.php',
+        'HyperFields\\SeparatorField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/SeparatorField.php',
+        'HyperFields\\TabsField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TabsField.php',
+        'HyperFields\\TemplateLoader' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TemplateLoader.php',
+        'HyperFields\\TermField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/TermField.php',
+        'HyperFields\\UserField' => __DIR__ . '/..' . '/estebanforge/hyperfields/src/UserField.php',
         'TraitWicketGuestPaymentLogger' => __DIR__ . '/../..' . '/src/TraitWicketGuestPaymentLogger.php',
         'WicketGuestPayment' => __DIR__ . '/../..' . '/src/WicketGuestPayment.php',
         'WicketGuestPaymentAdmin' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdmin.php',
@@ -56,9 +84,9 @@ class ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit82e4b0ec187c6d0fc9c6a18b47bd4c01::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInita4e8b28c0866b5883bce3a6ab9d2416f::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInita4e8b28c0866b5883bce3a6ab9d2416f::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInita4e8b28c0866b5883bce3a6ab9d2416f::$classMap;
 
         }, null, ClassLoader::class);
     }
