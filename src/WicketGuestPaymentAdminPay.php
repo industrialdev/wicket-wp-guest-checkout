@@ -222,10 +222,17 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             return;
         }
 
+        $token_present = '' !== $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_TOKEN);
+        $secret_present = '' !== $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_SECRET);
         $data = $this->get_active_admin_pay_session();
+
         if (!$data) {
             return;
         }
+
+        $admin_id = isset($data['admin_id']) ? (int) $data['admin_id'] : 0;
+        $customer_id = isset($data['customer_id']) ? (int) $data['customer_id'] : 0;
+        $order_id = isset($data['order_id']) ? (int) $data['order_id'] : 0;
 
         $action_url = esc_url(admin_url('admin-post.php'));
         $label = esc_html__('Cancel and Return to Admin', 'wicket-wgc');
