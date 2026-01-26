@@ -132,6 +132,12 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $this->set_admin_pay_cookie(self::ADMIN_PAY_COOKIE_TOKEN, $token, $expires);
         $this->set_admin_pay_cookie(self::ADMIN_PAY_COOKIE_SECRET, $return_secret, $expires);
 
+        $session_key = 'wgp_admin_pay_session_' . $customer_id;
+        set_transient($session_key, [
+            'token' => $token,
+            'secret' => $return_secret,
+        ], self::ADMIN_PAY_TTL);
+
         wp_clear_auth_cookie();
         wp_set_current_user($customer_id);
         wp_set_auth_cookie($customer_id, false, is_ssl());
@@ -320,12 +326,29 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
 
     private function set_admin_pay_cookie(string $name, string $value, int $expires): void
     {
-        setcookie($name, $value, $expires, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+        $cookie_domain = COOKIE_DOMAIN;
+        if ('' === $cookie_domain) {
+            $host = $_SERVER['HTTP_HOST'] ?? '';
+            $cookie_domain = preg_replace('/:\\d+$/', '', $host);
+        }
+
+        $same_site = is_ssl() ? 'None' : 'Lax';
+        setcookie($name, $value, [
+            'expires' => $expires,
+            'path' => COOKIEPATH,
+            'domain' => $cookie_domain,
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => $same_site,
+        ]);
     }
 
     private function get_admin_pay_cookie(string $name): string
     {
-        return isset($_COOKIE[$name]) ? sanitize_key(wp_unslash($_COOKIE[$name])) : '';
+        $raw = $_COOKIE[$name] ?? '';
+        $sanitized = '' !== $raw ? sanitize_key(wp_unslash($raw)) : '';
+
+        return $sanitized;
     }
 
     private function clear_admin_pay_cookies(): void
@@ -333,6 +356,12 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $expire = time() - HOUR_IN_SECONDS;
         setcookie(self::ADMIN_PAY_COOKIE_TOKEN, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
         setcookie(self::ADMIN_PAY_COOKIE_SECRET, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+
+        $customer_id = get_current_user_id();
+        if ($customer_id) {
+            $session_key = 'wgp_admin_pay_session_' . $customer_id;
+            delete_transient($session_key);
+        }
     }
 
     private function get_order_edit_url(int $order_id): string
@@ -396,6 +425,17 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     {
         $token = $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_TOKEN);
         $secret = $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_SECRET);
+        if (!$token || !$secret) {
+            $customer_id = get_current_user_id();
+            if ($customer_id) {
+                $session_key = 'wgp_admin_pay_session_' . $customer_id;
+                $session_data = get_transient($session_key);
+                if (is_array($session_data)) {
+                    $token = (string) ($session_data['token'] ?? '');
+                    $secret = (string) ($session_data['secret'] ?? '');
+                }
+            }
+        }
         if (!$token || !$secret) {
             return null;
         }
