@@ -873,10 +873,6 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             || $order->meta_exists('_wgp_guest_payment_token_created');
 
         if (!$has_token_data) {
-            $this->log(
-                sprintf('No token data found for Order ID: %d during invalidation attempt. Skipping.', $order_id)
-            );
-
             return true; // Return true as there's nothing to invalidate
         }
 
@@ -1186,9 +1182,6 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         $user_id = $order->get_user_id();
 
-        $this->log(
-            sprintf('Payment complete/Order status paid for order #%d. Attempting to invalidate token.', $order_id)
-        );
         $this->invalidate_token_for_order($order_id); // Existing method handles logging success/failure
     }
 
