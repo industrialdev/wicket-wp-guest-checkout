@@ -189,30 +189,30 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
         if (!$token_data) {
             // No valid token exists - show form to generate and send
             ?>
-			<div id="wicket-guest-payment-generate-<?php echo esc_attr($order_id); ?>" class="wicket-guest-payment-generate-section">
-				<h4><?php esc_html_e('Generate and Send Link', 'wicket-wgc'); ?></h4>
-				<p>
-					<label for="wicket_guest_email_send_<?php echo esc_attr($order_id); ?>"><?php esc_html_e('Guest Email:', 'wicket-wgc'); ?></label>
-					<input type="email" id="wicket_guest_email_send_<?php echo esc_attr($order_id); ?>" name="wicket_guest_email" value="" class="regular-text wicket-guest-email-input" style="width: 100%;">
-					<span class="spinner wicket-ajax-spinner"></span>
-				</p>
-				<?php $ajax_send_nonce = wp_create_nonce('wicket_generate_send_ajax_' . $order_id); ?>
-				<button type="button" class="button button-primary wicket-generate-send-button"
-					data-order-id="<?php echo esc_attr($order_id); ?>"
-					data-nonce="<?php echo esc_attr($ajax_send_nonce); ?>">
-					<?php esc_html_e('Generate & Send Email', 'wicket-wgc'); ?>
-				</button>
-				<span class="spinner wicket-ajax-spinner"></span>
-				<div class="wicket-ajax-feedback wicket-ajax-feedback-top notice" style="display: none; margin-top: 10px;"></div>
-			</div>
-		<?php
+            <div id="wicket-guest-payment-generate-<?php echo esc_attr($order_id); ?>" class="wicket-guest-payment-generate-section">
+                <h4><?php esc_html_e('Generate and Send Link', 'wicket-wgc'); ?></h4>
+                <p>
+                    <label for="wicket_guest_email_send_<?php echo esc_attr($order_id); ?>"><?php esc_html_e('Guest Email:', 'wicket-wgc'); ?></label>
+                    <input type="email" id="wicket_guest_email_send_<?php echo esc_attr($order_id); ?>" name="wicket_guest_email" value="" class="regular-text wicket-guest-email-input" style="width: 100%;">
+                    <span class="spinner wicket-ajax-spinner"></span>
+                </p>
+                <?php $ajax_send_nonce = wp_create_nonce('wicket_generate_send_ajax_' . $order_id); ?>
+                <button type="button" class="button button-primary wicket-generate-send-button"
+                    data-order-id="<?php echo esc_attr($order_id); ?>"
+                    data-nonce="<?php echo esc_attr($ajax_send_nonce); ?>">
+                    <?php esc_html_e('Generate & Send Email', 'wicket-wgc'); ?>
+                </button>
+                <span class="spinner wicket-ajax-spinner"></span>
+                <div class="wicket-ajax-feedback wicket-ajax-feedback-top notice" style="display: none; margin-top: 10px;"></div>
+            </div>
+        <?php
         } else {
             // Valid token exists - show management options
             $created_date = wp_date(get_option('date_format') . ' ' . get_option('time_format'), $token_data['created_timestamp']);
             $generation_method = $token_data['generation_method'] ?? 'email'; // Get method, default to 'email'
             ?>
-			<h4><?php esc_html_e('Manage Existing Link', 'wicket-wgc'); ?></h4>
-			<?php
+            <h4><?php esc_html_e('Manage Existing Link', 'wicket-wgc'); ?></h4>
+            <?php
                 if ($generation_method === 'manual') {
                     // Message for manually generated links
                     if (empty($token_data['guest_email'])) {
@@ -231,88 +231,88 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
                     );
                 }
             ?>
-			<p><?php printf(esc_html__('Link created on: %s', 'wicket-wgc'), '<em>' . esc_html($created_date) . '</em>'); ?></p>
+            <p><?php printf(esc_html__('Link created on: %s', 'wicket-wgc'), '<em>' . esc_html($created_date) . '</em>'); ?></p>
 
-			<div class="wicket-manage-link-container" style="display: flex; flex-direction: column; gap: 10px;">
-				<div style="display: flex; gap: 10px; align-items: center;">
-					<!-- Resend Token Button -->
-					<div style="position: relative;">
-						<button type="button" class="button button-secondary wicket-resend-email-button"
-							data-order-id="<?php echo esc_attr($order_id); ?>"
-							data-nonce="<?php echo esc_attr(wp_create_nonce('wicket_resend_email_' . $order_id)); ?>"
-							data-guest-email="<?php echo esc_attr($token_data['guest_email']); ?>">
-							<?php esc_html_e('Resend Email', 'wicket-wgc'); ?>
-						</button>
-						<span class="spinner wicket-ajax-spinner" style="margin-left: 4px;"></span>
-					</div>
+            <div class="wicket-manage-link-container" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <!-- Resend Token Button -->
+                    <div style="position: relative;">
+                        <button type="button" class="button button-secondary wicket-resend-email-button"
+                            data-order-id="<?php echo esc_attr($order_id); ?>"
+                            data-nonce="<?php echo esc_attr(wp_create_nonce('wicket_resend_email_' . $order_id)); ?>"
+                            data-guest-email="<?php echo esc_attr($token_data['guest_email']); ?>">
+                            <?php esc_html_e('Resend Email', 'wicket-wgc'); ?>
+                        </button>
+                        <span class="spinner wicket-ajax-spinner" style="margin-left: 4px;"></span>
+                    </div>
 
-					<!-- Invalidate Token Button -->
-					<div style="position: relative;">
-						<button type="button" class="button button-link-delete wicket-invalidate-link-button"
-							data-order-id="<?php echo esc_attr($order_id); ?>"
-							data-nonce="<?php echo esc_attr(wp_create_nonce('wicket_invalidate_link_' . $order_id)); ?>"
-							data-confirm="<?php echo esc_attr__('Are you sure you want to invalidate this payment link? The guest will no longer be able to use it.', 'wicket-wgc'); ?>">
-							<?php esc_html_e('Invalidate Link', 'wicket-wgc'); ?>
-						</button>
-						<span class="spinner wicket-ajax-spinner" style="margin-left: 4px;"></span>
-					</div>
-				</div>
-				<!-- Feedback area for manage buttons -->
-				<div class="wicket-ajax-feedback wicket-ajax-feedback-top notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
-			</div>
-		<?php
+                    <!-- Invalidate Token Button -->
+                    <div style="position: relative;">
+                        <button type="button" class="button button-link-delete wicket-invalidate-link-button"
+                            data-order-id="<?php echo esc_attr($order_id); ?>"
+                            data-nonce="<?php echo esc_attr(wp_create_nonce('wicket_invalidate_link_' . $order_id)); ?>"
+                            data-confirm="<?php echo esc_attr__('Are you sure you want to invalidate this payment link? The guest will no longer be able to use it.', 'wicket-wgc'); ?>">
+                            <?php esc_html_e('Invalidate Link', 'wicket-wgc'); ?>
+                        </button>
+                        <span class="spinner wicket-ajax-spinner" style="margin-left: 4px;"></span>
+                    </div>
+                </div>
+                <!-- Feedback area for manage buttons -->
+                <div class="wicket-ajax-feedback wicket-ajax-feedback-top notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
+            </div>
+        <?php
         }
         // END: Generate/Send Email OR Manage Existing Token
 
         // START: Add 'Generate Link Manually' Button
         ?>
-		<hr style="margin: 20px 0;">
-		<h4><?php esc_html_e('Manual Link Generation', 'wicket-wgc'); ?></h4>
-		<p><?php esc_html_e('Generate a new link (invalidating any previous one) without sending an email. The link will appear below.', 'wicket-wgc'); ?></p>
+        <hr style="margin: 20px 0;">
+        <h4><?php esc_html_e('Manual Link Generation', 'wicket-wgc'); ?></h4>
+        <p><?php esc_html_e('Generate a new link (invalidating any previous one) without sending an email. The link will appear below.', 'wicket-wgc'); ?></p>
 
-		<?php
+        <?php
         // Prepare link data, always render container but hide if no link yet
         $has_token = $token_data && !empty($token_data['token']);
         $manual_guest_link = $has_token ? add_query_arg('guest_payment_token', $token_data['token'], wc_get_cart_url()) : '';
         $container_style = $has_token ? '' : ' style="display: none;"';
         ?>
-		<div class="wicket-guest-payment-manual-link" <?php echo $container_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Style attribute is controlled
+        <div class="wicket-guest-payment-manual-link" <?php echo $container_style; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Style attribute is controlled
         ?>>
-			<label for="wicket_manual_guest_link_<?php echo esc_attr($order_id); ?>" style="display: block; margin-bottom: 5px;"><strong><?php esc_html_e('Current Payment Link:', 'wicket-wgc'); ?></strong></label>
-			<div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; margin-bottom: 5px;">
-				<input type="text" id="wicket_manual_guest_link_<?php echo esc_attr($order_id); ?>" readonly value="<?php echo esc_attr($manual_guest_link); ?>" style="width: calc(100% - 120px);">
-				<button type="button" class="button wicket-copy-link-button" style="flex-shrink: 0;"><?php esc_html_e('Copy Link', 'wicket-wgc'); ?></button>
-				<span class="wicket-copy-feedback" style="display: none; color: #008a20; white-space: nowrap;"><?php esc_html_e('Copied!', 'wicket-wgc'); ?></span>
-			</div>
-			<span class="description"><?php esc_html_e('This is the current active link for the guest.', 'wicket-wgc'); ?></span>
-		</div>
+            <label for="wicket_manual_guest_link_<?php echo esc_attr($order_id); ?>" style="display: block; margin-bottom: 5px;"><strong><?php esc_html_e('Current Payment Link:', 'wicket-wgc'); ?></strong></label>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; margin-bottom: 5px;">
+                <input type="text" id="wicket_manual_guest_link_<?php echo esc_attr($order_id); ?>" readonly value="<?php echo esc_attr($manual_guest_link); ?>" style="width: calc(100% - 120px);">
+                <button type="button" class="button wicket-copy-link-button" style="flex-shrink: 0;"><?php esc_html_e('Copy Link', 'wicket-wgc'); ?></button>
+                <span class="wicket-copy-feedback" style="display: none; color: #008a20; white-space: nowrap;"><?php esc_html_e('Copied!', 'wicket-wgc'); ?></span>
+            </div>
+            <span class="description"><?php esc_html_e('This is the current active link for the guest.', 'wicket-wgc'); ?></span>
+        </div>
 
-		<?php
+        <?php
         // Show 'no link' message only if there isn't one initially
         if (!$has_token) {
             ?>
-			<p id="wgp-no-link-message"><em><?php esc_html_e('No valid payment link currently exists for this order.', 'wicket-wgc'); ?></em></p>
-		<?php
+            <p id="wgp-no-link-message"><em><?php esc_html_e('No valid payment link currently exists for this order.', 'wicket-wgc'); ?></em></p>
+        <?php
         }
         ?>
 
-		<!-- Button container - Should always be present -->
-		<div id="wicket-guest-payment-manual-generate" style="margin-top: 15px;">
-			<?php $ajax_manual_nonce = wp_create_nonce('wicket_generate_manual_ajax_' . $order_id); ?>
-			<button type="button" class="button wicket-generate-manual-button"
-				data-order-id="<?php echo esc_attr($order_id); ?>"
-				data-nonce="<?php echo esc_attr($ajax_manual_nonce); ?>"
-				data-confirm="<?php echo esc_attr__('Are you sure? Generating a new link will invalidate any existing link for this order.', 'wicket-wgc'); ?>">
-				<?php echo $has_token ? esc_html__('Generate New Link', 'wicket-wgc') : esc_html__('Generate Link', 'wicket-wgc'); ?>
-			</button>
-			<span class="spinner wicket-ajax-spinner"></span>
-			<div class="wicket-ajax-feedback wicket-ajax-feedback-bottom notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
-		</div>
+        <!-- Button container - Should always be present -->
+        <div id="wicket-guest-payment-manual-generate" style="margin-top: 15px;">
+            <?php $ajax_manual_nonce = wp_create_nonce('wicket_generate_manual_ajax_' . $order_id); ?>
+            <button type="button" class="button wicket-generate-manual-button"
+                data-order-id="<?php echo esc_attr($order_id); ?>"
+                data-nonce="<?php echo esc_attr($ajax_manual_nonce); ?>"
+                data-confirm="<?php echo esc_attr__('Are you sure? Generating a new link will invalidate any existing link for this order.', 'wicket-wgc'); ?>">
+                <?php echo $has_token ? esc_html__('Generate New Link', 'wicket-wgc') : esc_html__('Generate Link', 'wicket-wgc'); ?>
+            </button>
+            <span class="spinner wicket-ajax-spinner"></span>
+            <div class="wicket-ajax-feedback wicket-ajax-feedback-bottom notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
+        </div>
 
-		<hr style="margin: 20px 0;">
-		<h4><?php esc_html_e('Pay For Customer', 'wicket-wgc'); ?></h4>
-		<p><?php esc_html_e('Open a secure checkout session for this order. You will be returned to this order after payment completes.', 'wicket-wgc'); ?></p>
-		<?php
+        <hr style="margin: 20px 0;">
+        <h4><?php esc_html_e('Pay For Customer', 'wicket-wgc'); ?></h4>
+        <p><?php esc_html_e('Open a secure checkout session for this order. You will be returned to this order after payment completes.', 'wicket-wgc'); ?></p>
+        <?php
         if (!$this->current_user_is_admin()) {
             echo '<p><em>' . esc_html__('Admin access required.', 'wicket-wgc') . '</em></p>';
         } else {
@@ -325,11 +325,47 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
                     'wicket_admin_pay_' . $order_id
                 );
                 ?>
-				<a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
-					<?php esc_html_e('Pay Now', 'wicket-wgc'); ?>
-				</a>
-				<p class="description" style="margin-top: 8px;"><?php esc_html_e('Opens in a new tab and temporarily switches to the customer for payment.', 'wicket-wgc'); ?></p>
-			<?php
+                <a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
+                    <?php esc_html_e('Pay for Customer Now', 'wicket-wgc'); ?>
+                </a>
+                <div id="wgp-admin-pay-overlay" class="wgp-admin-pay-overlay" style="display: none;" aria-hidden="true">
+                    <div class="wgp-admin-pay-overlay__panel" role="dialog" aria-live="polite">
+                        <p class="wgp-admin-pay-overlay__title"><?php esc_html_e('Admin Pay Session Starting', 'wicket-wgc'); ?></p>
+                        <p class="wgp-admin-pay-overlay__text"><?php esc_html_e('A checkout tab has opened for the customer. If you close it or lose access, use the button below to return to your admin session.', 'wicket-wgc'); ?></p>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <input type="hidden" name="action" value="wicket_admin_pay_return">
+                            <?php wp_nonce_field('wicket_admin_pay_return'); ?>
+                            <button type="submit" class="wgp-admin-pay-overlay__button">
+                                <?php esc_html_e('Cancel and Return to Admin', 'wicket-wgc'); ?>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <p class="description" style="margin-top: 8px;"><?php esc_html_e('Opens in a new tab and temporarily switches to the customer for payment.', 'wicket-wgc'); ?></p>
+                <style>
+                    .wgp-admin-pay-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.7); display: flex; align-items: center; justify-content: center; z-index: 100000; padding: 24px; }
+                    .wgp-admin-pay-overlay__panel { width: min(640px, 100%); background: #ffffff; border-radius: 12px; padding: 28px; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); }
+                    .wgp-admin-pay-overlay__title { margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1d2327; }
+                    .wgp-admin-pay-overlay__text { margin: 0 0 20px 0; font-size: 14px; color: #3c434a; }
+                    .wgp-admin-pay-overlay__button { width: 100%; background: var(--wp--preset--color--primary, #2271b1); color: #ffffff; border: 0; padding: 14px 20px; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; }
+                    .wgp-admin-pay-overlay__button:hover { filter: brightness(0.95); }
+                    .wgp-admin-pay-overlay__button:focus { outline: 3px solid #111111; outline-offset: 2px; }
+                </style>
+                <script>
+                    (function() {
+                        const payLink = document.querySelector('a.button.button-primary[href*="action=wicket_admin_pay"]');
+                        const overlay = document.getElementById('wgp-admin-pay-overlay');
+                        if (!payLink || !overlay) {
+                            return;
+                        }
+
+                        payLink.addEventListener('click', () => {
+                            overlay.style.display = 'flex';
+                            overlay.setAttribute('aria-hidden', 'false');
+                        });
+                    })();
+                </script>
+            <?php
             }
         }
         ?>
