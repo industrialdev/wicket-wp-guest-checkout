@@ -25,6 +25,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     {
         add_action('admin_post_wicket_admin_pay', [$this, 'handle_admin_pay_request']);
         add_action('admin_post_wicket_admin_pay_return', [$this, 'handle_admin_pay_return']);
+        add_action('admin_post_nopriv_wicket_admin_pay_return', [$this, 'handle_admin_pay_return']);
         add_action('template_redirect', [$this, 'maybe_start_admin_pay_session'], 5);
         add_action('template_redirect', [$this, 'maybe_auto_return_admin'], 6);
         add_action('wp_footer', [$this, 'render_admin_pay_return_button']);
@@ -494,9 +495,18 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
      */
     public function handle_admin_pay_return(): void
     {
-        check_admin_referer('wicket_admin_pay_return');
+        $nonce = isset($_REQUEST['_wpnonce']) ? sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])) : '';
+        $nonce_valid = $nonce ? wp_verify_nonce($nonce, 'wicket_admin_pay_return') : false;
 
         $data = $this->get_active_admin_pay_session();
+        if (!$nonce_valid && !$data) {
+            wp_die(esc_html__('Security check failed or session expired.', 'wicket-wgc'));
+        }
+
+        if (!$data) {
+            $data = $this->get_active_admin_pay_session();
+        }
+
         if (!$data) {
             wp_die(esc_html__('Admin pay session expired or invalid.', 'wicket-wgc'));
         }
@@ -511,7 +521,8 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             wp_die(esc_html__('Admin pay session data incomplete.', 'wicket-wgc'));
         }
 
-        if (get_current_user_id() !== $customer_id) {
+        $current_user_id = get_current_user_id();
+        if ($current_user_id && ($current_user_id !== $customer_id && $current_user_id !== $admin_id)) {
             wp_die(esc_html__('You do not have permission to return.', 'wicket-wgc'));
         }
 

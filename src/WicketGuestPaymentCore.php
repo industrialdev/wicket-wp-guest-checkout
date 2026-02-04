@@ -1121,9 +1121,11 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $token = $encrypted_token ? $this->decrypt_data($encrypted_token) : false;
 
         if ($token === false) {
-            $this->log(
-                sprintf('Token decryption failed during validation for Order ID: %d.', $order_id)
-            );
+            if ($this->should_log_decryption_error()) {
+                $this->log(
+                    sprintf('Token decryption failed during validation for Order ID: %d.', $order_id)
+                );
+            }
 
             return null; // Decryption failed
         }
@@ -1282,10 +1284,12 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $decrypted = openssl_decrypt($ciphertext, $method, $key, OPENSSL_RAW_DATA, $iv);
 
         if ($decrypted === false) {
-            $this->log(
-                sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data. Data: %s', $data),
-                'error'
-            );
+            if ($this->should_log_decryption_error()) {
+                $this->log(
+                    sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data. Data: %s', $data),
+                    'error'
+                );
+            }
 
             return false;
         }
@@ -1415,6 +1419,32 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             if (!empty($session_flag)) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Determines whether decryption errors should be logged for the current request.
+     *
+     * @return bool
+     */
+    private function should_log_decryption_error(): bool
+    {
+        if (is_admin()) {
+            return false;
+        }
+
+        if ($this->is_guest_payment_session()) {
+            return true;
+        }
+
+        if (function_exists('is_wc_endpoint_url') && is_wc_endpoint_url('order-pay')) {
+            return true;
+        }
+
+        if (function_exists('is_checkout') && is_checkout() && !is_admin()) {
+            return true;
         }
 
         return false;

@@ -325,47 +325,81 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
                     'wicket_admin_pay_' . $order_id
                 );
                 ?>
-                <a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
-                    <?php esc_html_e('Pay for Customer Now', 'wicket-wgc'); ?>
-                </a>
+            <a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
+                <?php esc_html_e('Pay for Customer Now', 'wicket-wgc'); ?>
+            </a>
                 <div id="wgp-admin-pay-overlay" class="wgp-admin-pay-overlay" style="display: none;" aria-hidden="true">
                     <div class="wgp-admin-pay-overlay__panel" role="dialog" aria-live="polite">
                         <p class="wgp-admin-pay-overlay__title"><?php esc_html_e('Admin Pay Session Starting', 'wicket-wgc'); ?></p>
                         <p class="wgp-admin-pay-overlay__text"><?php esc_html_e('A checkout tab has opened for the customer. If you close it or lose access, use the button below to return to your admin session.', 'wicket-wgc'); ?></p>
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <input type="hidden" name="action" value="wicket_admin_pay_return">
-                            <?php wp_nonce_field('wicket_admin_pay_return'); ?>
-                            <button type="submit" class="wgp-admin-pay-overlay__button">
+                        <div class="wgp-admin-pay-overlay__actions">
+                            <button
+                                type="button"
+                                class="button button-primary wgp-admin-pay-overlay__return"
+                                data-action="wicket_admin_pay_return"
+                                data-nonce="<?php echo esc_attr(wp_create_nonce('wicket_admin_pay_return')); ?>"
+                                data-url="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                            >
                                 <?php esc_html_e('Cancel and Return to Admin', 'wicket-wgc'); ?>
                             </button>
-                        </form>
-                    </div>
+                        </div>
                 </div>
-                <p class="description" style="margin-top: 8px;"><?php esc_html_e('Opens in a new tab and temporarily switches to the customer for payment.', 'wicket-wgc'); ?></p>
-                <style>
-                    .wgp-admin-pay-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.7); display: flex; align-items: center; justify-content: center; z-index: 100000; padding: 24px; }
-                    .wgp-admin-pay-overlay__panel { width: min(640px, 100%); background: #ffffff; border-radius: 12px; padding: 28px; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); }
-                    .wgp-admin-pay-overlay__title { margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1d2327; }
-                    .wgp-admin-pay-overlay__text { margin: 0 0 20px 0; font-size: 14px; color: #3c434a; }
-                    .wgp-admin-pay-overlay__button { width: 100%; background: var(--wp--preset--color--primary, #2271b1); color: #ffffff; border: 0; padding: 14px 20px; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; }
-                    .wgp-admin-pay-overlay__button:hover { filter: brightness(0.95); }
-                    .wgp-admin-pay-overlay__button:focus { outline: 3px solid #111111; outline-offset: 2px; }
-                </style>
-                <script>
-                    (function() {
-                        const payLink = document.querySelector('a.button.button-primary[href*="action=wicket_admin_pay"]');
-                        const overlay = document.getElementById('wgp-admin-pay-overlay');
-                        if (!payLink || !overlay) {
-                            return;
-                        }
+            </div>
+            <p class="description" style="margin-top: 8px;"><?php esc_html_e('Opens in a new tab and temporarily switches to the customer for payment.', 'wicket-wgc'); ?></p>
+            <style>
+                .wgp-admin-pay-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.7); display: flex; align-items: center; justify-content: center; z-index: 100000; padding: 24px; }
+                .wgp-admin-pay-overlay__panel { width: min(640px, 100%); background: #ffffff; border-radius: 12px; padding: 28px; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); }
+                .wgp-admin-pay-overlay__title { margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #1d2327; }
+                .wgp-admin-pay-overlay__text { margin: 0 0 20px 0; font-size: 14px; color: #3c434a; }
+                .wgp-admin-pay-overlay__actions { display: flex; justify-content: center; }
+                .wgp-admin-pay-overlay__actions .button { padding: 10px 18px; }
+            </style>
+            <script>
+                (function() {
+                    const payLink = document.querySelector('a.button.button-primary[href*="action=wicket_admin_pay"]');
+                    const overlay = document.getElementById('wgp-admin-pay-overlay');
+                    const returnButton = overlay ? overlay.querySelector('.wgp-admin-pay-overlay__return') : null;
+                    if (!payLink || !overlay) {
+                        return;
+                    }
 
-                        payLink.addEventListener('click', () => {
-                            overlay.style.display = 'flex';
-                            overlay.setAttribute('aria-hidden', 'false');
+                    payLink.addEventListener('click', () => {
+                        overlay.style.display = 'flex';
+                        overlay.setAttribute('aria-hidden', 'false');
+                    });
+
+                    if (returnButton) {
+                        returnButton.addEventListener('click', () => {
+                            const actionUrl = returnButton.getAttribute('data-url') || '';
+                            const actionName = returnButton.getAttribute('data-action') || '';
+                            const nonce = returnButton.getAttribute('data-nonce') || '';
+                            if (!actionUrl || !actionName || !nonce) {
+                                return;
+                            }
+
+                            const form = document.createElement('form');
+                            form.method = 'post';
+                            form.action = actionUrl;
+
+                            const actionInput = document.createElement('input');
+                            actionInput.type = 'hidden';
+                            actionInput.name = 'action';
+                            actionInput.value = actionName;
+                            form.appendChild(actionInput);
+
+                            const nonceInput = document.createElement('input');
+                            nonceInput.type = 'hidden';
+                            nonceInput.name = '_wpnonce';
+                            nonceInput.value = nonce;
+                            form.appendChild(nonceInput);
+
+                            document.body.appendChild(form);
+                            form.submit();
                         });
-                    })();
-                </script>
-            <?php
+                    }
+                })();
+            </script>
+        <?php
             }
         }
         ?>
