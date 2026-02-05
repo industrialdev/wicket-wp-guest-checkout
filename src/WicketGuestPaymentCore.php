@@ -560,7 +560,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
         $token_hash = hash_hmac('sha256', $token, defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') ? WICKET_GUEST_PAYMENT_ENCRYPTION_KEY : '');
 
-        $this->log(sprintf('Token encryption and HMAC hash generation successful for Order ID: %d', $order_id));
+        $this->log(sprintf('Token encryption and HMAC hash generation successful for Order ID: %d (Hash: %s)', $order_id, $token_hash));
 
         // Store metadata
         $timestamp = time();
@@ -610,6 +610,17 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 ? get_post_meta($order_id, '_wgp_guest_payment_token_created', true)
                 : $order->get_meta('_wgp_guest_payment_token_created');
 
+            $this->log(
+                sprintf(
+                    'Stored guest payment meta for %s ID %d (Hash: %s, Encrypted: %s, Created: %s)',
+                    $is_subscription ? 'Subscription' : 'Order',
+                    $order_id,
+                    $stored_hash ?: 'missing',
+                    $stored_encrypted ? 'present' : 'missing',
+                    $stored_timestamp ? 'present' : 'missing'
+                )
+            );
+
             //$this->log(
             //    sprintf(
             //        'Stored token data - Order ID: %d, Type: %s, Hash: %s, Encrypted: %s, Timestamp: %d',
@@ -641,14 +652,28 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return false;
         }
 
-        // Hash the input token using the dedicated encryption key
-        $encryption_key = defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') ? WICKET_GUEST_PAYMENT_ENCRYPTION_KEY : '';
-        if (empty($encryption_key)) {
-            $this->log('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY is not defined. Cannot validate token.', 'error');
+        $encryption_keys = $this->get_encryption_keys();
+        if (empty($encryption_keys)) {
+            $this->log('No guest payment encryption keys available. Cannot validate token.', 'error');
 
-            return false; // Stop validation if key is missing
+            return false; // Stop validation if no keys are available
         }
-        $input_token_hash = hash_hmac('sha256', $token, $encryption_key);
+
+        $this->log(
+            sprintf(
+                'Validating guest payment token %s with %d encryption key(s).',
+                $this->mask_token($token),
+                count($encryption_keys)
+            )
+        );
+
+        $input_token_hash = '';
+        $matched_key = '';
+        $matched_key_hash = '';
+        $found_ids = [];
+        $found_order_id = 0;
+        $found_order = null;
+        $status = 'unknown';
 
         // Log token and hash for debugging
         //$this->log(
@@ -660,136 +685,113 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         //    )
         //);
 
-        // First, try to find the order or subscription with any status to provide better debugging
-        $meta_query = [
-            [
-                'key'     => '_wgp_guest_payment_token_hash',
-                'value'   => $input_token_hash,
-                'compare' => '=',
-            ],
-        ];
+        foreach ($encryption_keys as $key) {
+            $input_token_hash = hash_hmac('sha256', $token, $key);
+            $meta_query = [
+                [
+                    'key'     => '_wgp_guest_payment_token_hash',
+                    'value'   => $input_token_hash,
+                    'compare' => '=',
+                ],
+            ];
 
-        // Try querying for subscriptions first using wcs_get_subscriptions
-        $subscription_query_args = [
-            'subscriptions_per_page' => 1,
-            'subscription_status'    => 'any', // Look for subscriptions in any status
-            'meta_query'             => $meta_query,
-            'return'                 => 'ids',
-        ];
-        //$this->log(
-        //    sprintf(
-        //        'Searching for subscriptions with wcs_get_subscriptions: %s',
-        //        json_encode($subscription_query_args)
-        //    )
-        //);
-        $found_ids = function_exists('wcs_get_subscriptions') ? wcs_get_subscriptions($subscription_query_args) : [];
-        //$this->log(
-        //    sprintf(
-        //        'wcs_get_subscriptions result for hash %s: %s',
-        //        $input_token_hash,
-        //        json_encode($found_ids)
-        //    )
-        //);
+            $subscription_query_args = [
+                'subscriptions_per_page' => 20,
+                'subscription_status'    => 'any',
+                'meta_query'             => $meta_query,
+                'return'                 => 'ids',
+            ];
 
-        // If a subscription was found by wcs_get_subscriptions, extract the ID from the array keys
-        $is_subscription_check = false;
-        if (!empty($found_ids) && function_exists('wcs_get_subscriptions')) {
-            $subscription_keys = array_keys($found_ids);
-            if (!empty($subscription_keys)) {
-                $found_order_id = $subscription_keys[0]; // Get the first key, which is the ID
-                //$this->log(sprintf('Extracted subscription ID %d from wcs_get_subscriptions result.', $found_order_id));
-                // Clear the $found_ids array to prevent falling into the order logic if we already have a subscription ID
-                // We need $found_ids to be non-empty later, so we put the extracted ID into it
-                $found_ids = [$found_order_id];
-                $is_subscription_check = true; // Mark that we found a subscription
-            } else {
-                $found_ids = []; // Ensure it's empty if keys extraction failed
+            $found_ids = function_exists('wcs_get_subscriptions') ? wcs_get_subscriptions($subscription_query_args) : [];
+
+            if (!empty($found_ids) && function_exists('wcs_get_subscriptions')) {
+                $subscription_keys = array_keys($found_ids);
+                $found_ids = !empty($subscription_keys) ? $subscription_keys : [];
             }
-        }
 
-        // If no subscription found, try querying for regular orders using wc_get_orders
-        if (empty($found_ids)) {
             $order_query_args = [
-                'limit'      => 1,
+                'limit'      => 20,
                 'type'       => 'shop_order',
                 'meta_query' => $meta_query,
                 'return'     => 'ids',
             ];
-            //$this->log(
-            //    sprintf(
-            //        'Searching for orders with wc_get_orders: %s',
-            //        json_encode($order_query_args)
-            //    )
-            //);
-            $found_ids = wc_get_orders($order_query_args);
-            //$this->log(
-            //    sprintf(
-            //        'wc_get_orders (orders only) result for hash %s: %s',
-            //        $input_token_hash,
-            //        json_encode($found_ids)
-            //    )
-            //);
-        }
+            $order_ids = wc_get_orders($order_query_args);
 
-        // Log if we found an order/subscription with any status
-        if (!empty($found_ids)) {
-            // If we are here, $found_ids should contain exactly one ID, either from subscription or order query
-            $found_order_id = $found_ids[0]; // Get the first (and only) order ID
-            $found_order = wc_get_order($found_order_id); // This works for both order and subscription IDs
-            $status = $found_order ? $found_order->get_status() : 'unknown';
+            $fallback_ids = $this->query_order_ids_by_token_hash($input_token_hash);
+            if (!empty($fallback_ids)) {
+                $this->log(
+                    sprintf('Fallback DB lookup found %d order(s) for token hash %s.', count($fallback_ids), $input_token_hash)
+                );
+            }
 
-            // Define base allowed statuses
+            $candidate_ids = array_values(array_unique(array_merge($found_ids, $order_ids, $fallback_ids)));
+            if (empty($candidate_ids)) {
+                continue;
+            }
+
             $base_allowed_statuses = ['pending', 'failed', 'on-hold'];
             $allowed_statuses = apply_filters('wicket_guest_payment_allowed_order_statuses', $base_allowed_statuses);
-            // $is_subscription = $found_order && $found_order->is_type('subscription'); // Removed this line
 
-            // If it's a subscription (based on our flag), add 'active' to the allowed statuses
-            if ($is_subscription_check) { // Use the flag instead of is_type()
-                // Use apply_filters to allow modification specifically for subscriptions
-                $subscription_allowed_statuses = apply_filters('wicket_guest_payment_allowed_subscription_statuses', array_merge($allowed_statuses, ['active']));
-                // Ensure no duplicates
-                $allowed_statuses = array_unique($subscription_allowed_statuses);
-                //$this->log(sprintf('Identified as subscription. Allowed statuses: %s', implode(', ', $allowed_statuses)));
-            } else {
-                //$this->log(sprintf('Identified as order. Allowed statuses: %s', implode(', ', $allowed_statuses)));
+            foreach ($candidate_ids as $candidate_id) {
+                $candidate_order = wc_get_order($candidate_id);
+                if (!$candidate_order) {
+                    continue;
+                }
+
+                $status = $candidate_order->get_status();
+                $is_subscription = $candidate_order instanceof WC_Subscription;
+                if (!$is_subscription && method_exists($candidate_order, 'get_type')) {
+                    $is_subscription = $candidate_order->get_type() === 'shop_subscription';
+                }
+                $candidate_allowed_statuses = $allowed_statuses;
+
+                if ($is_subscription) {
+                    $subscription_allowed_statuses = apply_filters(
+                        'wicket_guest_payment_allowed_subscription_statuses',
+                        array_merge($candidate_allowed_statuses, ['active'])
+                    );
+                    $candidate_allowed_statuses = array_unique($subscription_allowed_statuses);
+                }
+
+                if (!$candidate_order->has_status($candidate_allowed_statuses)) {
+                    continue;
+                }
+
+                $encrypted_token = $candidate_order->get_meta('_wgp_guest_payment_token_encrypted');
+                $decrypted_token = $encrypted_token
+                    ? $this->decrypt_data_with_key($encrypted_token, $key)
+                    : false;
+
+                if ($decrypted_token !== $token) {
+                    continue;
+                }
+
+                $created_timestamp = $candidate_order->get_meta('_wgp_guest_payment_token_created');
+                $expiry_timestamp = $this->get_token_expiry_timestamp((int) $created_timestamp);
+                if (empty($created_timestamp) || time() > $expiry_timestamp) {
+                    $this->log(
+                        sprintf('Token expired or timestamp missing for Order ID %d. Token: %s', $candidate_id, $token)
+                    );
+                    continue;
+                }
+
+                $found_order_id = $candidate_id;
+                $found_order = $candidate_order;
+                $order_id = $candidate_id;
+                $order = $candidate_order;
+                $matched_key = $key;
+                $matched_key_hash = $input_token_hash;
+
+                $this->log(
+                    sprintf(
+                        'Guest payment token hash matched Order ID %d (Status: %s, Subscription: %s).',
+                        $found_order_id,
+                        $status,
+                        $is_subscription ? 'yes' : 'no'
+                    )
+                );
+                break 2;
             }
-
-            //$this->log(
-            //    sprintf('Found order #%d with status "%s" for token hash.', $found_order_id, $status)
-            //);
-
-            // Check if the found order/subscription has an allowed status
-            $is_status_allowed = $found_order && $found_order->has_status($allowed_statuses);
-
-            //$this->log(sprintf('Result of has_status() check: %s', $is_status_allowed ? 'true' : 'false'));
-
-            if ($is_status_allowed) {
-                // Status is allowed, proceed with this order/subscription
-                //$this->log(
-                //    sprintf('Order #%d has allowed status "%s". Proceeding with validation.', $found_order_id, $status)
-                //);
-                $order = $found_order;
-                $order_id = $found_order_id;
-                // Skip any later checks that might specifically look for 'pending' status
-                goto validate_token_details;
-            } else {
-                // Status is not allowed
-                //$this->log(
-                //    sprintf(
-                //        'Order #%d has status "%s" which is not in allowed statuses list: [%s].',
-                //        $found_order_id,
-                //        $status,
-                //        implode(', ', $allowed_statuses)
-                //    )
-                //);
-                // Explicitly clear order/order_id to prevent potential issues later
-                $order = null;
-                $order_id = 0;
-            }
-        } else {
-            //$this->log(
-            //    sprintf('No order found for token hash: %s', $input_token_hash)
-            //);
         }
 
         // If we reached here without finding a suitable order/subscription via the hash above,
@@ -799,51 +801,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         if (empty($order_id) || !$order) {
             $this->log(
                 sprintf(
-                    'No order/subscription with an allowed status found for token hash matching token: %s (Input Token Hash: %s)',
-                    $token,
-                    $input_token_hash
+                    'No order/subscription with an allowed status found for token %s (Input Token Hash: %s).',
+                    $this->mask_token($token),
+                    $matched_key_hash !== '' ? $matched_key_hash : $input_token_hash
                 )
             );
 
             return 'invalid_token'; // Or 'invalid_order_status' if more appropriate
         }
 
-        // Label for goto statement - execution jumps here if validation succeeded earlier.
-        validate_token_details:
-
         // Check if the order object is valid before proceeding
         if (!$order instanceof WC_Order && !$order instanceof WC_Subscription) {
             $this->log(sprintf('Failed to retrieve a valid order/subscription object for ID: %d.', $order_id));
 
             return 'invalid_token';
-        }
-
-        // --- Existing Token Validation Logic (Expiry, Anti-Tampering) ---
-        // Decrypt the stored token to verify it matches the input token (anti-tampering check)
-        $encrypted_token = $order->get_meta('_wgp_guest_payment_token_encrypted');
-        $decrypted_token = $encrypted_token ? $this->decrypt_data($encrypted_token) : false;
-
-        if ($decrypted_token !== $token) {
-            $this->log(
-                sprintf('Token hash matched for Order ID %d, but decrypted token did NOT match input token %s. Possible tampering or key change.', $order_id, $token)
-            );
-
-            // Don't proceed if the full token doesn't match after decryption
-            return false;
-        }
-
-        // Check token expiry
-        $created_timestamp = $order->get_meta('_wgp_guest_payment_token_created');
-        $expiry_timestamp = $this->get_token_expiry_timestamp((int) $created_timestamp);
-
-        if (empty($created_timestamp) || time() > $expiry_timestamp) {
-            $this->log(
-                sprintf('Token expired or timestamp missing for Order ID %d. Token: %s', $order_id, $token)
-            );
-
-            // Optionally invalidate the token meta here
-            // $this->invalidate_token_for_order($order_id);
-            return false;
         }
 
         // Token is valid
@@ -1190,6 +1161,109 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     // Encryption/Decryption Helpers
 
     /**
+     * Get current and legacy encryption keys for token validation.
+     *
+     * @return array<int, string>
+     */
+    private function get_encryption_keys(): array
+    {
+        $keys = [];
+
+        if (defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
+            $key = (string) WICKET_GUEST_PAYMENT_ENCRYPTION_KEY;
+            if ($key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        $filtered = apply_filters('wicket_guest_payment_encryption_keys', $keys);
+        if (is_string($filtered)) {
+            $filtered = [$filtered];
+        }
+
+        if (!is_array($filtered)) {
+            return $keys;
+        }
+
+        $filtered = array_values(array_filter(array_map('strval', $filtered), static function (string $value): bool {
+            return $value !== '';
+        }));
+
+        if (empty($filtered)) {
+            return $keys;
+        }
+
+        return array_values(array_unique($filtered));
+    }
+
+    /**
+     * Look up order IDs by token hash across both postmeta and COT tables.
+     *
+     * @param string $token_hash Token hash to search for.
+     * @return array<int, int>
+     */
+    private function query_order_ids_by_token_hash(string $token_hash): array
+    {
+        global $wpdb;
+
+        if ($token_hash === '') {
+            return [];
+        }
+
+        $order_ids = [];
+        $postmeta_table = $wpdb->postmeta;
+        $postmeta_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT post_id FROM {$postmeta_table} WHERE meta_key = %s AND meta_value = %s LIMIT 20",
+                '_wgp_guest_payment_token_hash',
+                $token_hash
+            )
+        );
+
+        if (!empty($postmeta_ids)) {
+            $order_ids = array_merge($order_ids, array_map('intval', $postmeta_ids));
+        }
+
+        $cot_meta_table = $wpdb->prefix . 'wc_orders_meta';
+        $cot_exists = $wpdb->get_var(
+            $wpdb->prepare('SHOW TABLES LIKE %s', $cot_meta_table)
+        );
+
+        if ($cot_exists === $cot_meta_table) {
+            $cot_ids = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT order_id FROM {$cot_meta_table} WHERE meta_key = %s AND meta_value = %s LIMIT 20",
+                    '_wgp_guest_payment_token_hash',
+                    $token_hash
+                )
+            );
+
+            if (!empty($cot_ids)) {
+                $order_ids = array_merge($order_ids, array_map('intval', $cot_ids));
+            }
+        }
+
+        return array_values(array_unique($order_ids));
+    }
+
+    /**
+     * Mask a token for safe logging.
+     *
+     * @param string $token Raw token.
+     * @return string Masked token.
+     */
+    private function mask_token(string $token): string
+    {
+        $token = trim($token);
+        $length = strlen($token);
+        if ($length <= 12) {
+            return str_repeat('*', $length);
+        }
+
+        return substr($token, 0, 6) . '...' . substr($token, -6);
+    }
+
+    /**
      * Encrypts data using OpenSSL with defined key and method.
      *
      * Requires WICKET_GUEST_PAYMENT_ENCRYPTION_KEY and WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD to be defined.
@@ -1252,6 +1326,28 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return false;
         }
         $key = WICKET_GUEST_PAYMENT_ENCRYPTION_KEY;
+
+        return $this->decrypt_data_with_key($data, (string) $key);
+    }
+
+    /**
+     * Decrypts data with a specific key.
+     *
+     * @param string $data Base64 encoded encrypted string (IV prepended).
+     * @param string $key Encryption key.
+     * @return string|false Decrypted data or false on failure/tampering.
+     */
+    private function decrypt_data_with_key(string $data, string $key): string|false
+    {
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+            $this->log(
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config. Data: %s', $data),
+                'error'
+            );
+
+            return false;
+        }
+
         $method = WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD;
         $decoded_data = base64_decode($data, true);
         if ($decoded_data === false) {
@@ -1260,8 +1356,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 'error'
             );
 
-            return false; // Invalid base64
+            return false;
         }
+
         $iv_length = openssl_cipher_iv_length($method);
         if ($iv_length === false) {
             $this->log(
@@ -1269,16 +1366,18 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 'error'
             );
 
-            return false; // Method not supported
+            return false;
         }
+
         if (mb_strlen($decoded_data, '8bit') < $iv_length) {
             $this->log(
                 sprintf('Decryption Error: Encrypted data too short. Data: %s', $data),
                 'error'
             );
 
-            return false; // Too short to contain IV
+            return false;
         }
+
         $iv = mb_substr($decoded_data, 0, $iv_length, '8bit');
         $ciphertext = mb_substr($decoded_data, $iv_length, null, '8bit');
         $decrypted = openssl_decrypt($ciphertext, $method, $key, OPENSSL_RAW_DATA, $iv);
@@ -1294,7 +1393,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return false;
         }
 
-        return $decrypted; // Returns false on failure
+        return $decrypted;
     }
 
     /**
