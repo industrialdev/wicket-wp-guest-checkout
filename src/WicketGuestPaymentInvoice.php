@@ -22,11 +22,8 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
         // WooCommerce email: insert guest payment message just below 'Pay for this order' link
         add_action('woocommerce_email_before_order_table', [$this, 'insert_guest_payment_link_email'], 15, 4);
 
-        // Check if PDF Invoices & Packing Slips plugin is active before registering PDF hooks
-        if (class_exists('WPO_WCPDF') || class_exists('WPO\IPS\Main')) {
-            // PDF Invoices & Packing Slips plugin - Move to footer
-            add_action('wpo_wcpdf_after_footer', [$this, 'append_guest_payment_link_to_pdf'], 99, 2);
-        }
+        // PDF Invoices & Packing Slips plugin hooks (safe to register even if plugin loads later)
+        add_action('wpo_wcpdf_after_order_details', [$this, 'append_guest_payment_link_to_pdf'], 99, 2);
     }
 
     /**
@@ -184,12 +181,18 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
      */
     public function append_guest_payment_link_to_pdf($document, $order)
     {
-        // Check if PDF integration is enabled (default: true)
-        if (!apply_filters('wicket/wooguestpay/pdf_integration_enabled', true)) {
-            return;
+        // PDF plugin passes ($document, $order) or ($order, $document) depending on version, so normalize.
+        $hook = current_filter();
+        $document_type = null;
+        if (is_string($document)) {
+            $document_type = $document;
+        } elseif (is_object($document)) {
+            if (property_exists($document, 'type')) {
+                $document_type = (string) $document->type;
+            } elseif (method_exists($document, 'get_type')) {
+                $document_type = (string) $document->get_type();
+            }
         }
-
-        // PDF plugin passes ($document, $order) or ($order, $document) depending on version, so normalize:
         if ($order instanceof WC_Order) {
             $order_obj = $order;
         } elseif ($document instanceof WC_Order) {
@@ -197,18 +200,34 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
         } elseif (is_object($document) && method_exists($document, 'get_order')) {
             $order_obj = $document->get_order();
         } else {
+            $this->log('PDF integration: unable to resolve order object.', 'warning', ['hook' => $hook]);
+
             return;
         }
         if (!($order_obj instanceof WC_Order)) {
+            $this->log('PDF integration: resolved order is not a WC_Order instance.', 'warning', ['hook' => $hook]);
+
             return;
         }
-        if ('pending' !== $order_obj->get_status()) {
+        if (!apply_filters('wicket/wooguestpay/pdf_integration_enabled', true, $document_type)) {
             return;
         }
-        $link = $this->get_or_generate_guest_payment_link($order_obj->get_id());
+        if (!$order_obj->has_status(['pending', 'failed', 'on-hold'])) {
+            return;
+        }
+        $order_id = $order_obj->get_id();
+        $render_key = $order_id . '|' . ($document_type ?? 'unknown');
+        static $rendered = [];
+        if (isset($rendered[$render_key])) {
+            return;
+        }
+        $link = $this->get_or_generate_guest_payment_link($order_id);
         if (!$link) {
+            $this->log('PDF integration: guest payment link not available.', 'warning', ['order_id' => $order_id, 'hook' => $hook]);
+
             return;
         }
+        $rendered[$render_key] = true;
         $link_text = __('guest payment', 'wicket-wgc');
         $link_html = '<a href="' . esc_url($link) . '" style="color:#0073aa;text-decoration:underline;">' . esc_html($link_text) . '</a>';
         $message = sprintf(

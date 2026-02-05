@@ -45,7 +45,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         add_filter('wicket/wooguestpay/email_integration_enabled', [$this, 'filter_email_integration_enabled'], 10, 1);
 
         // PDF integration configuration
-        add_filter('wicket/wooguestpay/pdf_integration_enabled', [$this, 'filter_pdf_integration_enabled'], 10, 1);
+        add_filter('wicket/wooguestpay/pdf_integration_enabled', [$this, 'filter_pdf_integration_enabled'], 10, 2);
 
         // Token expiry configuration
         add_filter('wicket/wooguestpay/token_expiry_days', [$this, 'filter_token_expiry_days'], 10, 1);
@@ -84,7 +84,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
      * @param bool $default_enabled Default enabled status.
      * @return bool Filtered enabled status.
      */
-    public function filter_pdf_integration_enabled(bool $default_enabled): bool
+    public function filter_pdf_integration_enabled(bool $default_enabled, ?string $document_type = null): bool
     {
         // Check if enabled via WordPress option
         if ($this->get_option_bool(self::OPTION_PDF_ENABLED)) {
