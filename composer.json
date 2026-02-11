@@ -1,75 +1,76 @@
 {
-    "name": "industrialdev/wicket-wp-guest-checkout",
-    "description": "Wicket Guest Checkout - Secure guest payment system for WooCommerce",
-    "version": "1.2.8",
-    "type": "wordpress-plugin",
-    "keywords": [
-        "wordpress",
-        "woocommerce",
-        "guest-payment",
-        "payment-link",
-        "subscription"
-    ],
-    "homepage": "https://github.com/industrialdev/wicket-wp-guest-checkout",
-    "license": "GPL-2.0-or-later",
-    "authors": [
-        {
-            "name": "Wicket Inc.",
-            "email": "info@wicket.io",
-            "homepage": "https://wicket.io"
-        }
-    ],
-    "require": {
-        "php": ">=8.3"
-    },
-    "require-dev": {
-        "brain/monkey": "^2",
-        "friendsofphp/php-cs-fixer": "^3",
-        "pestphp/pest": "^4",
-        "pestphp/pest-plugin-browser": "^4",
-        "phpunit/phpunit": "^12"
-    },
-    "autoload": {
-        "psr-4": {
-            "Wicket\\GuestPayment\\": "src/"
-        },
-        "classmap": [
-            "src/"
-        ]
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Tests\\": "tests/",
-            "Wicket\\GuestPayment\\Tests\\": "tests/unit/"
-        }
-    },
-    "scripts": {
-        "production": "rm -rf vendor && composer install --no-dev --optimize-autoloader",
-        "setup-hooks": "mkdir -p .git/hooks && cp .ci/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push && echo 'Git hooks installed to .git/hooks/pre-push'",
-        "test": "pest",
-        "test:unit": "pest --testsuite unit",
-        "test:coverage": "pest --coverage-html coverage",
-        "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser",
-        "lint": "php-cs-fixer fix --dry-run --diff",
-        "format": "php-cs-fixer fix",
-        "check": [
-            "@lint",
-            "@test"
-        ],
-        "cs:fix": "php-cs-fixer fix"
-    },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true,
-    "scripts-descriptions": {
-        "test": "Run Pest tests",
-        "test-coverage": "Run Pest tests with HTML coverage report",
-        "test:browser": "Run Pest browser tests against https://localhost",
-        "cs:fix": "Run PHP CS Fixer to fix coding standards issues"
+  "authors": [
+    {
+      "email": "info@wicket.io",
+      "homepage": "https://wicket.io",
+      "name": "Wicket Inc."
     }
+  ],
+  "autoload": {
+    "classmap": [
+      "src/"
+    ],
+    "psr-4": {
+      "Wicket\\GuestPayment\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/",
+      "Wicket\\GuestPayment\\Tests\\": "tests/unit/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    },
+    "platform-check": false,
+    "sort-packages": true
+  },
+  "description": "Wicket Guest Checkout - Secure guest payment system for WooCommerce",
+  "homepage": "https://github.com/industrialdev/wicket-wp-guest-checkout",
+  "keywords": [
+    "wordpress",
+    "woocommerce",
+    "guest-payment",
+    "payment-link",
+    "subscription"
+  ],
+  "license": "GPL-2.0-or-later",
+  "minimum-stability": "stable",
+  "name": "industrialdev/wicket-wp-guest-checkout",
+  "prefer-stable": true,
+  "require": {
+    "php": "\u003e=8.3"
+  },
+  "require-dev": {
+    "brain/monkey": "^2",
+    "friendsofphp/php-cs-fixer": "^3",
+    "pestphp/pest": "^4",
+    "pestphp/pest-plugin-browser": "^4",
+    "phpunit/phpunit": "^12"
+  },
+  "scripts": {
+    "check": [
+      "@lint",
+      "@test"
+    ],
+    "cs:fix": "php-cs-fixer fix",
+    "format": "php-cs-fixer fix",
+    "lint": "php-cs-fixer fix --dry-run --diff",
+    "production": "rm -rf vendor \u0026\u0026 composer install --no-dev --optimize-autoloader",
+    "setup-hooks": "mkdir -p .git/hooks \u0026\u0026 cp .ci/pre-push .git/hooks/pre-push \u0026\u0026 chmod +x .git/hooks/pre-push \u0026\u0026 echo 'Git hooks installed to .git/hooks/pre-push'",
+    "test": "pest",
+    "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser",
+    "test:coverage": "pest --coverage-html coverage",
+    "test:unit": "pest --testsuite unit"
+  },
+  "scripts-descriptions": {
+    "cs:fix": "Run PHP CS Fixer to fix coding standards issues",
+    "test": "Run Pest tests",
+    "test-coverage": "Run Pest tests with HTML coverage report",
+    "test:browser": "Run Pest browser tests against https://localhost"
+  },
+  "type": "wordpress-plugin",
+  "version": "1.2.9"
 }
