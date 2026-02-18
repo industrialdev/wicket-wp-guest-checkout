@@ -60,7 +60,7 @@
     "lint": "php-cs-fixer fix --dry-run --diff",
     "production": "rm -rf vendor \u0026\u0026 composer install --no-dev --optimize-autoloader",
     "setup-hooks": "mkdir -p .git/hooks \u0026\u0026 cp .ci/pre-push .git/hooks/pre-push \u0026\u0026 chmod +x .git/hooks/pre-push \u0026\u0026 echo 'Git hooks installed to .git/hooks/pre-push'",
-    "test": "pest",
+    "test": "[ -f vendor/bin/pest ] || composer update && pest",
     "test:browser": "WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser",
     "test:coverage": "pest --coverage-html coverage",
     "test:unit": "pest --testsuite unit"
