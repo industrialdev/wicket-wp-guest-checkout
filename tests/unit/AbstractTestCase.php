@@ -16,28 +16,32 @@ abstract class AbstractTestCase extends PHPUnitTestCase
 
         // Set up global $wpdb mock
         global $wpdb;
-        if (!isset($wpdb)) {
-            $wpdb = new class {
-                public $prefix = 'wp_';
-                public $options = 'wp_options';
+        $wpdb = new class {
+            public $prefix = 'wp_';
+            public $options = 'wp_options';
+            public $postmeta = 'wp_postmeta';
 
-                public function get_col($query)
-                {
-                    return [];
-                }
+            public function get_col($query)
+            {
+                return [];
+            }
 
-                public function prepare($query, ...$args)
-                {
-                    return $query;
-                }
+            public function get_var($query)
+            {
+                return null;
+            }
 
-                public function esc_like($text)
-                {
-                    return addcslashes($text, '_%\\');
-                }
-            };
-            $GLOBALS['wpdb'] = $wpdb;
-        }
+            public function prepare($query, ...$args)
+            {
+                return $query;
+            }
+
+            public function esc_like($text)
+            {
+                return addcslashes($text, '_%\\');
+            }
+        };
+        $GLOBALS['wpdb'] = $wpdb;
 
         // Default WooCommerce/WP mocks
         $logger = \Mockery::mock('WC_Logger');
@@ -59,12 +63,14 @@ abstract class AbstractTestCase extends PHPUnitTestCase
             'esc_url',
             'esc_url_raw',
             'is_email' => true,
+            'is_admin' => false,
             'wcs_get_subscriptions' => [],
             'sanitize_text_field',
             'wp_unslash',
             'wp_safe_redirect',
             'home_url',
             'wc_get_cart_url' => 'https://example.com/cart',
+            'wc_get_orders' => [],
             'wc_add_notice',
             'get_current_user_id' => 0,
             'get_user_meta',

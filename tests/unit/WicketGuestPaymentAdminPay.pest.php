@@ -62,7 +62,12 @@ it('starts admin pay session for valid admin', function (): void {
     $handler = new WicketGuestPaymentAdminPay();
     $redirect_url = null;
 
-    $order = new class {
+    $order = new class extends WC_Order {
+        public function needs_shipping(): bool
+        {
+            return false;
+        }
+
         public function get_status(): string
         {
             return 'pending';

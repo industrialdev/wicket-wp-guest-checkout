@@ -220,8 +220,21 @@ it('sends payment email with valid data', function (): void {
     Monkey\Functions\when('get_userdata')->justReturn($mockUser);
     Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
     Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
     Monkey\Functions\when('wp_date')->justReturn('2025-01-15');
     Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(fn (string $hook, $value, ...$args) => $value);
     Monkey\Functions\when('wp_mail')->justReturn(true);
 
     $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
@@ -238,11 +251,280 @@ it('returns false when wp_mail fails', function (): void {
     Monkey\Functions\when('get_userdata')->justReturn($mockUser);
     Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
     Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
     Monkey\Functions\when('wp_date')->justReturn('2025-01-15');
     Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(fn (string $hook, $value, ...$args) => $value);
     Monkey\Functions\when('wp_mail')->justReturn(false);
 
     $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
 
     expect($result)->toBeFalse();
+});
+
+it('uses wicket settings templates and keeps full html body markup', function (): void {
+    $email = wgp_email_boot();
+    $mockUser = wgp_email_mock_user();
+    $mockOrder = wgp_email_mock_order_with_methods();
+
+    $captured_subject = '';
+    $captured_message = '';
+
+    Monkey\Functions\when('is_email')->justReturn(true);
+    Monkey\Functions\when('get_userdata')->justReturn($mockUser);
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
+    Monkey\Functions\when('wp_date')->justReturn('2026-02-23');
+    Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'wicket_settings') {
+            return [
+                'wicket_admin_settings_guest_payment_email_subject_template' => 'Subject for {member_name} / {site_name}',
+                'wicket_admin_settings_guest_payment_email_body_template' => '<table><tr><td>{member_name}</td><td>{payment_link}</td></tr></table>',
+            ];
+        }
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(fn (string $hook, $value, ...$args) => $value);
+    Monkey\Functions\when('wp_mail')->alias(function ($to, $subject, $message, $headers) use (&$captured_subject, &$captured_message): bool {
+        $captured_subject = (string) $subject;
+        $captured_message = (string) $message;
+
+        return true;
+    });
+
+    $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
+
+    expect($result)->toBeTrue();
+    expect($captured_subject)->toBe('Subject for John Doe / Example Site');
+    expect($captured_message)->toContain('<table><tr><td>John Doe</td><td><a href="https://example.com/cart?guest_payment_token=token123">Complete Payment</a></td></tr></table>');
+});
+
+it('falls back to legacy template options when wicket settings templates are absent', function (): void {
+    $email = wgp_email_boot();
+    $mockUser = wgp_email_mock_user();
+    $mockOrder = wgp_email_mock_order_with_methods();
+
+    $captured_subject = '';
+
+    Monkey\Functions\when('is_email')->justReturn(true);
+    Monkey\Functions\when('get_userdata')->justReturn($mockUser);
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
+    Monkey\Functions\when('wp_date')->justReturn('2026-02-23');
+    Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'wicket_settings') {
+            return [];
+        }
+        if ($name === 'wicket_guest_payment_email_subject_template') {
+            return 'Legacy {site_name}';
+        }
+        if ($name === 'wicket_guest_payment_email_body_template') {
+            return '<p>Legacy body for {member_name}</p>';
+        }
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(fn (string $hook, $value, ...$args) => $value);
+    Monkey\Functions\when('wp_mail')->alias(function ($to, $subject, $message, $headers) use (&$captured_subject): bool {
+        $captured_subject = (string) $subject;
+
+        return true;
+    });
+
+    $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
+
+    expect($result)->toBeTrue();
+    expect($captured_subject)->toBe('Legacy Example Site');
+});
+
+it('sanitizes html when sanitize filter is enabled', function (): void {
+    $email = wgp_email_boot();
+    $mockUser = wgp_email_mock_user();
+    $mockOrder = wgp_email_mock_order_with_methods();
+
+    $captured_message = '';
+
+    Monkey\Functions\when('is_email')->justReturn(true);
+    Monkey\Functions\when('get_userdata')->justReturn($mockUser);
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
+    Monkey\Functions\when('wp_date')->justReturn('2026-02-23');
+    Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'wicket_settings') {
+            return [
+                'wicket_admin_settings_guest_payment_email_body_template' => '<p>Safe</p><script>alert(1)</script>',
+            ];
+        }
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(function (string $hook, $value, ...$args) {
+        if ($hook === 'wicket_guest_payment_email_sanitize_html') {
+            return true;
+        }
+
+        if ($hook === 'wicket_guest_payment_email_allowed_html') {
+            return ['p' => []];
+        }
+
+        return $value;
+    });
+    Monkey\Functions\when('wp_kses_allowed_html')->justReturn(['p' => []]);
+    Monkey\Functions\when('wp_kses')->alias(fn (string $html, array $allowed) => str_replace('<script>alert(1)</script>', '', $html));
+    Monkey\Functions\when('wp_mail')->alias(function ($to, $subject, $message, $headers) use (&$captured_message): bool {
+        $captured_message = (string) $message;
+
+        return true;
+    });
+
+    $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
+
+    expect($result)->toBeTrue();
+    expect($captured_message)->not->toContain('<script>alert(1)</script>');
+    expect($captured_message)->toContain('<p>Safe</p>');
+});
+
+it('allows email header customization via filter', function (): void {
+    $email = wgp_email_boot();
+    $mockUser = wgp_email_mock_user();
+    $mockOrder = wgp_email_mock_order_with_methods();
+
+    $captured_headers = [];
+
+    Monkey\Functions\when('is_email')->justReturn(true);
+    Monkey\Functions\when('get_userdata')->justReturn($mockUser);
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
+    Monkey\Functions\when('wp_date')->justReturn('2026-02-23');
+    Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'wicket_settings') {
+            return [];
+        }
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(function (string $hook, $value, ...$args) {
+        if ($hook === 'wicket_guest_payment_email_headers') {
+            $value[] = 'Reply-To: billing@example.com';
+
+            return $value;
+        }
+
+        return $value;
+    });
+    Monkey\Functions\when('wp_mail')->alias(function ($to, $subject, $message, $headers) use (&$captured_headers): bool {
+        $captured_headers = $headers;
+
+        return true;
+    });
+
+    $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
+
+    expect($result)->toBeTrue();
+    expect($captured_headers)->toContain('Reply-To: billing@example.com');
+});
+
+it('allows subject and content customization via filters and replaces payment_url placeholder', function (): void {
+    $email = wgp_email_boot();
+    $mockUser = wgp_email_mock_user();
+    $mockOrder = wgp_email_mock_order_with_methods();
+
+    $captured_subject = '';
+    $captured_message = '';
+
+    Monkey\Functions\when('is_email')->justReturn(true);
+    Monkey\Functions\when('get_userdata')->justReturn($mockUser);
+    Monkey\Functions\when('wc_get_order')->justReturn($mockOrder);
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart');
+    Monkey\Functions\when('add_query_arg')->justReturn('https://example.com/cart?guest_payment_token=token123');
+    Monkey\Functions\when('wp_date')->justReturn('2026-02-23');
+    Monkey\Functions\when('get_theme_mod')->justReturn(false);
+    Monkey\Functions\when('get_bloginfo')->justReturn('Example Site');
+    Monkey\Functions\when('get_option')->alias(function (string $name, $default = '') {
+        if ($name === 'wicket_settings') {
+            return [
+                'wicket_admin_settings_guest_payment_email_subject_template' => 'Raw {site_name}',
+                'wicket_admin_settings_guest_payment_email_body_template' => '<p>URL: {payment_url}</p>',
+            ];
+        }
+        if ($name === 'date_format') {
+            return 'Y-m-d';
+        }
+        if ($name === 'admin_email') {
+            return 'admin@example.com';
+        }
+
+        return $default;
+    });
+    Monkey\Functions\when('apply_filters')->alias(function (string $hook, $value, ...$args) {
+        if ($hook === 'wicket_guest_payment_email_subject') {
+            return 'Filtered Subject';
+        }
+
+        if ($hook === 'wicket_guest_payment_email_content') {
+            return '<div class="custom-wrapper">' . (string) $value . '</div>';
+        }
+
+        return $value;
+    });
+    Monkey\Functions\when('wp_mail')->alias(function ($to, $subject, $message, $headers) use (&$captured_subject, &$captured_message): bool {
+        $captured_subject = (string) $subject;
+        $captured_message = (string) $message;
+
+        return true;
+    });
+
+    $result = $email->send_payment_email('test@example.com', 'token123', 1, 1);
+
+    expect($result)->toBeTrue();
+    expect($captured_subject)->toBe('Filtered Subject');
+    expect($captured_message)->toContain('<div class="custom-wrapper"><p>URL: https://example.com/cart?guest_payment_token=token123</p></div>');
 });

@@ -24,6 +24,15 @@ if (!class_exists('TestWCOrder')) {
             return $this->status;
         }
 
+        public function has_status(array|string $statuses): bool
+        {
+            if (is_string($statuses)) {
+                return $this->status === $statuses;
+            }
+
+            return in_array($this->status, $statuses, true);
+        }
+
         public function get_billing_email(): string
         {
             return $this->billing_email;

@@ -220,6 +220,13 @@ class WicketGuestPayment
         $this->config = new WicketGuestPaymentConfig();
         $this->config->init();
 
+        // Apply configurable token expiry after config filters are registered.
+        $token_expiry_days = (int) apply_filters(
+            'wicket/wooguestpay/token_expiry_days',
+            $this->core->get_token_expiry_days()
+        );
+        $this->core->set_token_expiry_days($token_expiry_days);
+
         // Initialize email functionality
         $this->email = new WicketGuestPaymentEmail($this->core);
         $this->email->init();

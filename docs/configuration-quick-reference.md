@@ -1,325 +1,171 @@
 # Configuration Quick Reference
 
-This document provides a quick reference for all available configuration filters and constants for the Wicket Guest Checkout plugin.
+This document summarizes the currently supported configuration points in Wicket Guest Checkout.
 
-## Core Integration Filters
+## Admin Settings (Recommended)
 
-### Email Integration
+Use **Wicket -> Settings -> Integrations -> Guest Checkout** (`/wp-admin/admin.php?page=wicket-settings&tab=integrations&section=guest-checkout`).
+
+### Available Fields
+
+- **Token Expiry (days)**
+  - Stored in `wicket_settings[wicket_admin_settings_guest_payment_token_expiry_days]`
+  - Default: `7`
+- **Email Subject Template**
+  - Stored in `wicket_settings[wicket_admin_settings_guest_payment_email_subject_template]`
+- **Email Body Template** (full HTML supported)
+  - Stored in `wicket_settings[wicket_admin_settings_guest_payment_email_body_template]`
+
+### Template Placeholders
+
+- `<code>{site_name}</code>`
+- `<code>{member_name}</code>`
+- `<code>{order_number}</code>`
+- `<code>{order_total}</code>`
+- `<code>{payment_link}</code>` (HTML anchor)
+- `<code>{payment_url}</code>` (raw URL)
+- `<code>{expiry_date}</code>`
+- `<code>{subscription_details}</code>` (HTML snippet)
+
+## Integration Filters
+
+### Email Integration Message in WooCommerce Emails
 
 | Filter | Default | Description |
-|--------|---------|-------------|
-| `wicket/wooguestpay/email_integration_enabled` | `false` | Enable/disable guest payment links in WooCommerce emails |
+|---|---:|---|
+| `wicket/wooguestpay/email_integration_enabled` | `false` | Enables/disables automatic guest payment message insertion in WooCommerce pending-order emails. |
 
-**Enable Example:**
 ```php
 add_filter('wicket/wooguestpay/email_integration_enabled', '__return_true');
 ```
 
-**Conditional Example:**
-```php
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    return $order && $order->get_total() > 100; // Only for orders over $100
-}, 10, 2);
-```
-
-### PDF Integration
+### PDF Integration Message
 
 | Filter | Default | Description |
-|--------|---------|-------------|
-| `wicket/wooguestpay/pdf_integration_enabled` | `false` | Enable/disable guest payment links in PDF invoices |
+|---|---:|---|
+| `wicket/wooguestpay/pdf_integration_enabled` | `true` | Enables/disables automatic guest payment message insertion in supported PDF invoice outputs. |
 
-**Enable Example:**
 ```php
-add_filter('wicket/wooguestpay/pdf_integration_enabled', '__return_true');
+add_filter('wicket/wooguestpay/pdf_integration_enabled', '__return_false');
 ```
 
-**Document Type Example:**
-```php
-add_filter('wicket/wooguestpay/pdf_integration_enabled', function($enabled, $document) {
-    return $document && method_exists($document, 'get_type') && $document->get_type() === 'invoice';
-}, 10, 2);
-```
-
-## Security Configuration
-
-### Token Management
+### Token Expiry
 
 | Filter | Default | Description |
-|--------|---------|-------------|
-| `wicket/wooguestpay/token_expiry_days` | `7` | Number of days before guest payment tokens expire |
+|---|---:|---|
+| `wicket/wooguestpay/token_expiry_days` | `7` | Number of days before generated guest payment tokens expire. |
 
-**Extend Expiry:**
 ```php
-add_filter('wicket/wooguestpay/token_expiry_days', function($days) {
-    return 14; // 14 days instead of 7
+add_filter('wicket/wooguestpay/token_expiry_days', function ($days) {
+    return 14;
 });
 ```
 
-**Contextual Expiry:**
+## Core Validation Filters
+
+| Filter | Description |
+|---|---|
+| `wicket_guest_payment_allowed_order_statuses` | Allowed WooCommerce order statuses for token validation. |
+| `wicket_guest_payment_allowed_subscription_statuses` | Allowed subscription statuses when validating subscription-linked orders. |
+| `wicket_guest_payment_encryption_keys` | Encryption key set used for token validation/decryption compatibility. |
+
+## Admin-Sent Guest Payment Email Template Filters
+
+These apply to the dedicated guest payment email sent from order admin actions.
+
+### Subject
+
 ```php
-add_filter('wicket/wooguestpay/token_expiry_days', function($days, $context) {
-    if ($context === 'pdf') {
-        return 21; // Longer expiry for PDFs
+add_filter(
+    'wicket_guest_payment_email_subject',
+    function ($subject, $order, $token, $placeholders, $recipient_email, $user_data) {
+        return '[Payment Link] ' . $subject;
+    },
+    10,
+    6
+);
+```
+
+### Body Content
+
+```php
+add_filter(
+    'wicket_guest_payment_email_content',
+    function ($html, $order, $token, $placeholders, $recipient_email, $user_data) {
+        return '<div style="padding:12px 0">' . $html . '</div>';
+    },
+    10,
+    6
+);
+```
+
+### Headers
+
+```php
+add_filter(
+    'wicket_guest_payment_email_headers',
+    function (array $headers, $order, $token, $placeholders, $recipient_email, $user_data) {
+        $headers[] = 'Reply-To: billing@example.com';
+
+        return $headers;
+    },
+    10,
+    6
+);
+```
+
+### Optional HTML Sanitization
+
+Full HTML is allowed by default. To enforce sanitization:
+
+```php
+add_filter('wicket_guest_payment_email_sanitize_html', '__return_true');
+```
+
+Optionally customize allowed tags:
+
+```php
+add_filter(
+    'wicket_guest_payment_email_allowed_html',
+    function (array $allowed_html) {
+        $allowed_html['img'] = [
+            'src' => true,
+            'alt' => true,
+            'style' => true,
+            'width' => true,
+            'height' => true,
+        ];
+
+        return $allowed_html;
     }
-    return $days;
-}, 10, 2);
+);
 ```
 
-## Constants (wp-config.php)
+## WordPress Options (Legacy/Fallback)
 
-### Enable Constants
+These keys are still read for backward compatibility:
 
-```php
-// Enable email integration
-define('WICKET_GUEST_PAYMENT_ENABLE_EMAIL_INTEGRATION', true);
+- `wicket_guest_payment_token_expiry_days`
+- `wicket_guest_payment_email_subject_template`
+- `wicket_guest_payment_email_body_template`
+- `wicket_guest_payment_enable_email_integration`
+- `wicket_guest_payment_enable_pdf_integration`
 
-// Enable PDF integration
-define('WICKET_GUEST_PAYMENT_ENABLE_PDF_INTEGRATION', true);
-```
+Prefer using **Wicket Settings** keys for new implementations.
 
-### Disable Constants (Takes Precedence)
-
-```php
-// Disable email integration (overrides enable)
-define('WICKET_GUEST_PAYMENT_DISABLE_EMAIL_INTEGRATION', true);
-
-// Disable PDF integration (overrides enable)
-define('WICKET_GUEST_PAYMENT_DISABLE_PDF_INTEGRATION', true);
-```
-
-### Security Constants
+## Constants
 
 ```php
-// Custom encryption key (optional)
+// Optional custom encryption material
 define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'your-custom-encryption-key');
-
-// Custom encryption method (optional)
 define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
 
-// Enable debug mode
+// Optional debug flag
 define('WICKET_GUEST_PAYMENT_DEBUG', true);
 ```
 
-## WordPress Options
+## Related Docs
 
-### Enable/Disable Options
-
-```php
-// Enable email integration
-update_option('wicket_guest_payment_enable_email_integration', true);
-
-// Enable PDF integration
-update_option('wicket_guest_payment_enable_pdf_integration', true);
-
-// Disable integration
-update_option('wicket_guest_payment_enable_email_integration', false);
-update_option('wicket_guest_payment_enable_pdf_integration', false);
-```
-
-## Conditional Integration Examples
-
-### Order-Based Conditions
-
-```php
-// Enable only for specific order statuses
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    return $order && in_array($order->get_status(), ['pending', 'processing']);
-}, 10, 2);
-
-// Enable only for orders with specific products
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    if (!$order) return $enabled;
-
-    $target_products = [123, 456, 789]; // Product IDs
-    foreach ($order->get_items() as $item) {
-        if ($item instanceof WC_Order_Item_Product) {
-            if (in_array($item->get_product_id(), $target_products)) {
-                return true;
-            }
-        }
-    }
-    return $enabled;
-}, 10, 2);
-
-// Enable only for specific order total ranges
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    if (!$order) return $enabled;
-
-    $total = $order->get_total();
-    return $total >= 50 && $total <= 1000; // Between $50 and $1000
-}, 10, 2);
-```
-
-### User-Based Conditions
-
-```php
-// Enable only for specific user roles
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled) {
-    $user = wp_get_current_user();
-    return in_array('corporate_client', $user->roles) || in_array('wholesale_customer', $user->roles);
-});
-
-// Enable only for guest users (no logged-in user)
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled) {
-    return !is_user_logged_in();
-});
-```
-
-### Time-Based Conditions
-
-```php
-// Enable only during business hours
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled) {
-    $current_time = current_time('H');
-    return $current_time >= 9 && $current_time <= 17; // 9 AM to 5 PM
-});
-
-// Enable only on weekdays
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled) {
-    $day = current_time('w');
-    return $day >= 1 && $day <= 5; // Monday to Friday
-});
-```
-
-## Customization Filters
-
-### Email Customization
-
-```php
-// Customize email message
-add_filter('wicket_guest_payment_email_content', function($content, $order, $token) {
-    return '<p>Custom email content with order #' . $order->get_id() . '</p>' . $content;
-}, 10, 3);
-
-// Customize email subject
-add_filter('woocommerce_email_subject_new_order', function($subject, $order) {
-    if ($order->get_status() === 'pending') {
-        return '[Payment Link] ' . $subject;
-    }
-    return $subject;
-}, 10, 2);
-```
-
-### PDF Customization
-
-```php
-// Customize PDF link styling
-add_filter('wicket/wooguestpay/pdf_link_style', function($style) {
-    return 'color: #0066cc; font-weight: bold; font-size: 14px;';
-});
-
-// Customize PDF message
-add_filter('wicket/wooguestpay/pdf_message', function($message, $link) {
-    return sprintf(
-        '<div style="border-top:1px solid #ccc;padding-top:16px;margin-top:24px;">
-            <strong>Alternative Payment:</strong><br>
-            <a href="%s" style="%s">Click here for secure payment link</a>
-        </div>',
-        esc_url($link),
-        'color:#0066cc;font-weight:bold;text-decoration:none;'
-    );
-}, 10, 2);
-```
-
-### URL and Path Customization
-
-```php
-// Custom cart URL for guest payments
-add_filter('wicket_guest_payment_cart_url', function($url) {
-    return 'https://custom-domain.com/custom-cart-page';
-});
-
-// Custom redirect after payment
-add_filter('wicket_guest_payment_redirect_url', function($url, $order_id) {
-    return 'https://custom-domain.com/thank-you?order=' . $order_id;
-}, 10, 2);
-```
-
-## Testing Configuration
-
-### Check Current Settings
-
-```php
-// Check if email integration is enabled
-$email_enabled = apply_filters('wicket/wooguestpay/email_integration_enabled', false);
-error_log('Email integration enabled: ' . ($email_enabled ? 'Yes' : 'No'));
-
-// Check if PDF integration is enabled
-$pdf_enabled = apply_filters('wicket/wooguestpay/pdf_integration_enabled', false);
-error_log('PDF integration enabled: ' . ($pdf_enabled ? 'Yes' : 'No'));
-
-// Check token expiry
-$expiry_days = apply_filters('wicket/wooguestpay/token_expiry_days', 7);
-error_log('Token expiry days: ' . $expiry_days);
-```
-
-### Debug Hook Execution
-
-```php
-// Debug email hook
-add_action('woocommerce_email_before_order_table', function($order, $sent_to_admin, $plain_text, $email) {
-    error_log('Email hook executed for order: ' . $order->get_id());
-    error_log('Email integration enabled: ' . (apply_filters('wicket/wooguestpay/email_integration_enabled', false) ? 'Yes' : 'No'));
-}, 1, 4);
-
-// Debug PDF hook
-add_action('wpo_wcpdf_after_order_details', function($document, $order) {
-    error_log('PDF hook executed for order: ' . $order->get_id());
-    error_log('PDF integration enabled: ' . (apply_filters('wicket/wooguestpay/pdf_integration_enabled', false) ? 'Yes' : 'No'));
-}, 1, 2);
-```
-
-## Common Use Cases
-
-### B2B/Corporate Clients
-
-```php
-// Enable for B2B customers only
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    if (!$order) return $enabled;
-
-    $user_id = $order->get_user_id();
-    if ($user_id) {
-        $user = get_user_by('id', $user_id);
-        return in_array('b2b_client', $user->roles);
-    }
-
-    // Check for billing company
-    return !empty($order->get_billing_company());
-}, 10, 2);
-```
-
-### Subscription Renewals
-
-```php
-// Enable for subscription-related orders
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    if (!$order) return $enabled;
-
-    // Check if order contains subscriptions
-    if (function_exists('wcs_order_contains_subscription')) {
-        return wcs_order_contains_subscription($order);
-    }
-
-    return $enabled;
-}, 10, 2);
-```
-
-### High-Value Orders
-
-```php
-// Enable only for orders above threshold
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order) {
-    if (!$order) return $enabled;
-
-    $threshold = get_option('wicket_guest_payment_min_amount', 500);
-    return $order->get_total() >= $threshold;
-}, 10, 2);
-```
-
-## Related Documentation
-
-- [Email Integration Configuration](email-integration.md) - Detailed email setup
-- [PDF Integration Configuration](pdf-integration.md) - Detailed PDF setup
-- [Token Security](security.md) - Security considerations
-- [Advanced Configuration](advanced-config.md) - Advanced customization options
+- [Email Integration Configuration](email-integration.md)
+- [PDF Integration Configuration](pdf-integration.md)
+- [Email Template Customization](email-template-customization.md)

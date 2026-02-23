@@ -43,6 +43,7 @@ it('initializes components and properties during setup', function (): void {
     Monkey\Functions\when('plugin_dir_path')->justReturn('/var/www/plugin/');
     Monkey\Functions\when('load_plugin_textdomain')->justReturn(true);
     Monkey\Functions\when('is_admin')->justReturn(false);
+    Monkey\Functions\when('apply_filters')->alias(fn (string $hook, $value, ...$args) => $value);
 
     $plugin = new WicketGuestPayment();
     $plugin->plugin_setup();
@@ -57,6 +58,27 @@ it('initializes components and properties during setup', function (): void {
     expect($plugin->get_admin())->toBeNull();
     expect($plugin->get_invoice())->toBeInstanceOf(WicketGuestPaymentInvoice::class);
     expect($plugin->get_receipt())->toBeInstanceOf(WicketGuestPaymentReceipt::class);
+});
+
+it('applies configured token expiry days during setup', function (): void {
+    Monkey\Functions\when('wicket_guest_checkout_is_woocommerce_active')->justReturn(true);
+    Monkey\Functions\when('plugins_url')->justReturn('https://example.com/plugin/');
+    Monkey\Functions\when('plugin_dir_path')->justReturn('/var/www/plugin/');
+    Monkey\Functions\when('load_plugin_textdomain')->justReturn(true);
+    Monkey\Functions\when('is_admin')->justReturn(false);
+    Monkey\Functions\when('apply_filters')->alias(function (string $hook, $value, ...$args) {
+        if ($hook === 'wicket/wooguestpay/token_expiry_days') {
+            return 21;
+        }
+
+        return $value;
+    });
+
+    $plugin = new WicketGuestPayment();
+    $plugin->plugin_setup();
+
+    expect($plugin->get_core())->toBeInstanceOf(WicketGuestPaymentCore::class);
+    expect($plugin->get_core()->get_token_expiry_days())->toBe(21);
 });
 
 it('stores mapping when generating secure cart key', function (): void {

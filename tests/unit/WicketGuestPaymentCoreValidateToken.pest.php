@@ -13,6 +13,10 @@ function wgp_core_validate_encrypt_token(string $token, string $key): string
     return base64_encode($iv . $encrypted);
 }
 
+if (!class_exists('WC_Subscription') && class_exists('WC_Order')) {
+    class WC_Subscription extends WC_Order {}
+}
+
 it('returns false on empty token', function (): void {
     $core = new WicketGuestPaymentCore();
 
@@ -65,8 +69,8 @@ it('validates token and returns order', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($token);
@@ -100,13 +104,13 @@ it('returns false for expired token', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($token);
 
-    expect($result)->toBeFalse();
+    expect($result)->toBe('invalid_token');
 });
 
 it('returns false for tampered token', function (): void {
@@ -132,13 +136,13 @@ it('returns false for tampered token', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($tampered_token);
 
-    expect($result)->toBeFalse();
+    expect($result)->toBe('invalid_token');
 });
 
 it('accepts failed status orders', function (): void {
@@ -166,8 +170,8 @@ it('accepts failed status orders', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($token);
@@ -200,8 +204,8 @@ it('accepts on-hold status orders', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($token);
@@ -298,13 +302,13 @@ it('returns false when token timestamp missing', function (): void {
         return null;
     });
 
-    Functions\expect('wc_get_orders')->once()->andReturn([123]);
-    Functions\expect('wc_get_order')->with(123)->andReturn($order);
+    Functions\when('wc_get_orders')->justReturn([123]);
+    Functions\when('wc_get_order')->justReturn($order);
 
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($token);
 
-    expect($result)->toBeFalse();
+    expect($result)->toBe('invalid_token');
 });
 
 it('accepts active subscription status', function (): void {
@@ -321,7 +325,7 @@ it('accepts active subscription status', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Subscription');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('active');
     $order->shouldReceive('has_status')->with(Mockery::type('array'))
@@ -365,7 +369,7 @@ it('rejects tampered subscription token', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Subscription');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('active');
     $order->shouldReceive('has_status')->with(Mockery::type('array'))
@@ -391,7 +395,7 @@ it('rejects tampered subscription token', function (): void {
     $core = new WicketGuestPaymentCore();
     $result = $core->validate_token($tampered_token);
 
-    expect($result)->toBeFalse();
+    expect($result)->toBe('invalid_token');
 });
 
 it('rejects subscription with non-allowed status', function (): void {
@@ -408,7 +412,7 @@ it('rejects subscription with non-allowed status', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Subscription');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('cancelled');
     $order->shouldReceive('has_status')->with(Mockery::type('array'))
@@ -500,7 +504,7 @@ it('allows custom subscription status via filter', function (): void {
     $stored_meta_data = wgp_core_validate_encrypt_token($token, $key);
     $created_time = (string) time();
 
-    $order = Mockery::mock('WC_Order');
+    $order = Mockery::mock('WC_Subscription');
     $order->shouldReceive('get_id')->andReturn(123);
     $order->shouldReceive('get_status')->andReturn('custom-sub-status');
     $order->shouldReceive('has_status')->with(Mockery::type('array'))

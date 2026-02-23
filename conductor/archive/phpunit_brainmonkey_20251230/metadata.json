@@ -1,8 +1,0 @@
-{
-  "track_id": "phpunit_brainmonkey_20251230",
-  "type": "chore",
-  "status": "new",
-  "created_at": "2025-12-30T00:00:00Z",
-  "updated_at": "2025-12-30T00:00:00Z",
-  "description": "Implement automated PHPUnit 11 tests with BrainMonkey"
-}

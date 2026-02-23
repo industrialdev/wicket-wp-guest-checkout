@@ -17,6 +17,14 @@ defined('ABSPATH') || exit;
 class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
 {
     /**
+     * Option keys for customizable email templates.
+     */
+    private const OPTION_EMAIL_SUBJECT_TEMPLATE = 'wicket_guest_payment_email_subject_template'; // legacy fallback
+    private const OPTION_EMAIL_BODY_TEMPLATE = 'wicket_guest_payment_email_body_template'; // legacy fallback
+    private const OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE = 'wicket_admin_settings_guest_payment_email_subject_template';
+    private const OPTION_WICKET_EMAIL_BODY_TEMPLATE = 'wicket_admin_settings_guest_payment_email_body_template';
+
+    /**
      * Core functionality class.
      *
      * @var WicketGuestPaymentCore
@@ -97,60 +105,74 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
         }
 
         $payment_link = add_query_arg('guest_payment_token', $token, wc_get_cart_url());
-        $subject = sprintf(__('Payment Request for %s Subscription', 'wicket-wgc'), get_bloginfo('name'));
 
         // Get the expiry timestamp
         $expiry_timestamp = $this->core->get_token_expiry_timestamp();
         $expiry_date = wp_date(get_option('date_format'), $expiry_timestamp);
+        $placeholders = $this->build_email_placeholders($user_data, $order, $payment_link, $expiry_date, $order_id);
 
-        // Basic email body - consider creating a WC Email template for better customization
-        $message = sprintf(
-            __('<p>Hello,</p><p>You have received a request to complete payment for a subscription on behalf of %1$s.</p>', 'wicket-wgc'),
-            esc_html($user_data->first_name . ' ' . $user_data->last_name)
+        $subject_template = $this->get_email_subject_template();
+        $subject = trim(strip_tags(strtr($subject_template, $placeholders)));
+        $subject = (string) apply_filters(
+            'wicket_guest_payment_email_subject',
+            $subject,
+            $order,
+            $token,
+            $placeholders,
+            $recipient_email,
+            $user_data
         );
 
-        // Add order details
-        $message .= '<p>' . __('Order Number:', 'wicket-wgc') . ' ' . $order->get_order_number() . '</p>';
-        $message .= '<p>' . __('Order Total:', 'wicket-wgc') . ' ' . $order->get_formatted_order_total() . '</p>';
+        $body_template = $this->get_email_body_template();
+        $message = $this->render_message_from_template($body_template, $placeholders);
+        $message = (string) apply_filters(
+            'wicket_guest_payment_email_content',
+            $message,
+            $order,
+            $token,
+            $placeholders,
+            $recipient_email,
+            $user_data
+        );
 
-        // Add order items if this is a subscription
-        if (function_exists('wcs_order_contains_subscription') && wcs_order_contains_subscription($order_id)) {
-            $message .= '<p>' . __('Subscription Details:', 'wicket-wgc') . '</p>';
-            $message .= '<ul>';
-
-            foreach ($order->get_items() as $item_id => $item) {
-                // Ensure we are dealing with a product item before accessing product methods
-                if ($item instanceof WC_Order_Item_Product) {
-                    $message .= '<li>' . $item->get_name() . ' × ' . $item->get_quantity() . ' - '
-                        . wc_price($item->get_total()) . '</li>';
-                }
-            }
-
-            $message .= '</ul>';
+        // Full HTML is supported by default for implementers.
+        // Optional sanitization can be enabled via filter when stricter policy is required.
+        $sanitize_html = (bool) apply_filters(
+            'wicket_guest_payment_email_sanitize_html',
+            false,
+            $order,
+            $token,
+            $placeholders,
+            $recipient_email,
+            $user_data
+        );
+        if ($sanitize_html) {
+            $allowed_html = (array) apply_filters(
+                'wicket_guest_payment_email_allowed_html',
+                wp_kses_allowed_html('post'),
+                $order,
+                $token,
+                $placeholders,
+                $recipient_email,
+                $user_data
+            );
+            $message = (string) wp_kses($message, $allowed_html);
         }
-
-        $message .= sprintf(
-            __('<p>Please use the secure link below to complete the payment:</p><p><a href="%1$s">Complete Payment</a></p>', 'wicket-wgc'),
-            esc_url($payment_link)
-        );
-
-        $message .= sprintf(
-            __('<p>This payment link is valid until %1$s and can only be used once.</p>', 'wicket-wgc'),
-            $expiry_date
-        );
-
-        $message .= sprintf(
-            __('<p>If you have any questions about this payment request, please contact us.</p><p>Thank you,<br>%s</p>', 'wicket-wgc'),
-            get_bloginfo('name')
-        );
-
-        // Add branding and styling
         $message = $this->get_styled_email_template($message);
 
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
             'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>',
         ];
+        $headers = (array) apply_filters(
+            'wicket_guest_payment_email_headers',
+            $headers,
+            $order,
+            $token,
+            $placeholders,
+            $recipient_email,
+            $user_data
+        );
 
         $sent = wp_mail($recipient_email, $subject, $message, $headers);
 
@@ -168,6 +190,158 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
         }
 
         return $sent;
+    }
+
+    /**
+     * Build supported template placeholders and their values.
+     *
+     * @param object $user_data User data object.
+     * @param object $order Order object.
+     * @param string $payment_link Payment URL.
+     * @param string $expiry_date Formatted token expiry date.
+     * @param int    $order_id Order ID.
+     * @return array
+     */
+    private function build_email_placeholders(
+        object $user_data,
+        object $order,
+        string $payment_link,
+        string $expiry_date,
+        int $order_id
+    ): array {
+        $member_name = trim((string) ($user_data->first_name ?? '') . ' ' . (string) ($user_data->last_name ?? ''));
+        if ('' === $member_name && !empty($user_data->display_name)) {
+            $member_name = (string) $user_data->display_name;
+        }
+        if ('' === $member_name) {
+            $member_name = __('the member', 'wicket-wgc');
+        }
+
+        $subscription_details = $this->get_subscription_details_html($order, $order_id);
+
+        return [
+            '{site_name}' => esc_html(get_bloginfo('name')),
+            '{member_name}' => esc_html($member_name),
+            '{order_number}' => esc_html((string) $order->get_order_number()),
+            '{order_total}' => esc_html(strip_tags((string) $order->get_formatted_order_total())),
+            '{payment_url}' => esc_url($payment_link),
+            '{payment_link}' => sprintf(
+                '<a href="%1$s">%2$s</a>',
+                esc_url($payment_link),
+                esc_html__('Complete Payment', 'wicket-wgc')
+            ),
+            '{expiry_date}' => esc_html($expiry_date),
+            '{subscription_details}' => $subscription_details,
+        ];
+    }
+
+    /**
+     * Render HTML email body by replacing placeholders in the template.
+     *
+     * @param string $template Template content.
+     * @param array  $placeholders Placeholder replacement map.
+     * @return string
+     */
+    private function render_message_from_template(string $template, array $placeholders): string
+    {
+        return strtr($template, $placeholders);
+    }
+
+    /**
+     * Return configured email subject template or fallback default.
+     *
+     * @return string
+     */
+    private function get_email_subject_template(): string
+    {
+        $subject_template = (string) $this->get_wicket_option(self::OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE, '');
+
+        // Backward compatibility with legacy standalone option.
+        if ('' === trim($subject_template)) {
+            $subject_template = (string) get_option(self::OPTION_EMAIL_SUBJECT_TEMPLATE, '');
+        }
+
+        if ('' === trim($subject_template)) {
+            $subject_template = __('Payment Request for {site_name} Subscription', 'wicket-wgc');
+        }
+
+        return $subject_template;
+    }
+
+    /**
+     * Return configured email body template or fallback default.
+     *
+     * @return string
+     */
+    private function get_email_body_template(): string
+    {
+        $body_template = (string) $this->get_wicket_option(self::OPTION_WICKET_EMAIL_BODY_TEMPLATE, '');
+
+        // Backward compatibility with legacy standalone option.
+        if ('' === trim($body_template)) {
+            $body_template = (string) get_option(self::OPTION_EMAIL_BODY_TEMPLATE, '');
+        }
+
+        if ('' === trim($body_template)) {
+            $body_template = __(
+                "<p>Hello,</p>\n\n<p>\nYou have received a request to complete payment for a subscription on behalf of {member_name}.<br>\nOrder Number: {order_number}<br>\nOrder Total: {order_total}\n</p>\n\n{subscription_details}\n\n<p>\nPlease use the secure link below to complete the payment:<br>\n{payment_link}\n</p>\n\n<p>This payment link is valid until {expiry_date} and can only be used once.</p>\n\n<p>If you have any questions about this payment request, please contact us.</p>\n\n<p>Thank you,<br>\n{site_name}</p>",
+                'wicket-wgc'
+            );
+        }
+
+        return $body_template;
+    }
+
+    /**
+     * Read a value from Wicket Settings (`wicket_settings` option array).
+     *
+     * @param string $key Option key.
+     * @param mixed  $fallback Fallback value.
+     * @return mixed
+     */
+    private function get_wicket_option(string $key, $fallback = null)
+    {
+        if (function_exists('wicket_get_option')) {
+            return wicket_get_option($key, $fallback);
+        }
+
+        $options = get_option('wicket_settings', []);
+        if (!is_array($options)) {
+            return $fallback;
+        }
+
+        return $options[$key] ?? $fallback;
+    }
+
+    /**
+     * Build subscription line-items HTML for template placeholder output.
+     *
+     * @param object $order Order object.
+     * @param int    $order_id Order ID.
+     * @return string
+     */
+    private function get_subscription_details_html(object $order, int $order_id): string
+    {
+        if (!function_exists('wcs_order_contains_subscription') || !wcs_order_contains_subscription($order_id)) {
+            return '';
+        }
+
+        $lines = [];
+        foreach ($order->get_items() as $item) {
+            if ($item instanceof WC_Order_Item_Product) {
+                $lines[] = sprintf('<li>%1$s x %2$d - %3$s</li>',
+                    esc_html($item->get_name()),
+                    (int) $item->get_quantity(),
+                    esc_html(strip_tags((string) wc_price($item->get_total())))
+                );
+            }
+        }
+
+        if (empty($lines)) {
+            return '';
+        }
+
+        return '<p>' . esc_html__('Subscription Details:', 'wicket-wgc') . '</p><ul>' . implode('', $lines) . '</ul>';
     }
 
     /**

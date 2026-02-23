@@ -1,231 +1,163 @@
 # Email Integration Configuration
 
-This document explains how to configure and enable the guest payment email integration feature for the Wicket Guest Checkout plugin.
+This guide covers both email-related features in Wicket Guest Checkout.
 
-## Overview
+## Two Email Features
 
-The email integration feature automatically adds guest checkout URLs to WooCommerce emails sent for pending orders. This allows recipients to complete payment on behalf of the original customer.
+### 1. WooCommerce Email Integration Message
 
-**Security Note:** This feature is **disabled by default** and requires explicit activation to ensure secure implementation.
+This inserts a guest payment message/link into WooCommerce order emails via `woocommerce_email_before_order_table`.
 
-## How It Works
+- Enabled by filter: `wicket/wooguestpay/email_integration_enabled`
+- Runtime default: `false`
+- Target order status: `pending`
 
-When enabled, the plugin will:
+### 2. Admin-Sent Guest Payment Email Template
 
-1. **Automatically detect** pending orders in WooCommerce emails
-2. **Dynamically generate** secure guest payment tokens
-3. **Inject guest payment links** into email content
-4. **Provide user-friendly message** for third-party payers
+When admins click **Generate & Send Email** in the order Guest Payment meta box, this plugin sends a dedicated guest-payment email.
 
-## Configuration Options
+This email is now configurable from:
 
-### Enable Email Integration
+- **Wicket -> Settings -> Integrations -> Guest Checkout**
+- Direct URL: `/wp-admin/admin.php?page=wicket-settings&tab=integrations&section=guest-checkout`
 
-To enable automatic guest payment URL generation in emails, you have several options:
+## Enable/Disable WooCommerce Email Integration Message
 
-#### Method 1: Filter (Recommended)
-
-Add to your theme's `functions.php` or a custom plugin:
+### Filter (recommended)
 
 ```php
-/**
- * Enable guest payment email integration
- */
 add_filter('wicket/wooguestpay/email_integration_enabled', '__return_true');
 ```
 
-#### Method 2: WordPress Option
-
-Enable via WordPress options API:
+### Option API
 
 ```php
-// Enable programmatically
 update_option('wicket_guest_payment_enable_email_integration', true);
-
-// Disable programmatically
-update_option('wicket_guest_payment_enable_email_integration', false);
+// or false
 ```
 
-### Disable Email Integration
+## Configure Admin-Sent Email Template
 
-You can explicitly disable the feature even if enabled by other methods:
+In **Guest Checkout** section, configure:
 
-#### Method 1: Filter
+- **Token Expiry (days)**
+- **Email Subject Template**
+- **Email Body Template** (full HTML)
+
+### Supported Placeholders
+
+- `<code>{site_name}</code>`
+- `<code>{member_name}</code>`
+- `<code>{order_number}</code>`
+- `<code>{order_total}</code>`
+- `<code>{payment_link}</code>`
+- `<code>{payment_url}</code>`
+- `<code>{expiry_date}</code>`
+- `<code>{subscription_details}</code>`
+
+### HTML Behavior
+
+- Body template is rendered as full HTML (no automatic paragraph conversion).
+- `<code>{payment_link}</code>` resolves to an `<a>` tag.
+- `<code>{subscription_details}</code>` resolves to HTML when applicable.
+
+## Template Filters (Admin-Sent Email)
+
+### Subject
 
 ```php
-/**
- * Disable guest payment email integration
- */
-add_filter('wicket/wooguestpay/email_integration_enabled', '__return_false');
+add_filter(
+    'wicket_guest_payment_email_subject',
+    function ($subject, $order, $token, $placeholders, $recipient_email, $user_data) {
+        return '[Invoice Payment] ' . $subject;
+    },
+    10,
+    6
+);
 ```
 
-#### Method 2: WordPress Option
+### Body HTML
 
 ```php
-// Disable via WordPress option
-update_option('wicket_guest_payment_enable_email_integration', false);
+add_filter(
+    'wicket_guest_payment_email_content',
+    function ($html, $order, $token, $placeholders, $recipient_email, $user_data) {
+        return '<div class="my-wrapper">' . $html . '</div>';
+    },
+    10,
+    6
+);
 ```
 
-## Email Content
-
-When enabled, guest payment information is automatically added to WooCommerce emails with the message:
-
-> "Will someone else be paying this invoice? Use our [guest payment](link) link to complete this transaction."
-
-### Email Hooks
-
-The integration uses the following WooCommerce hooks:
-
-- **Hook:** `woocommerce_email_before_order_table`
-- **Priority:** 15
-- **Target:** All pending order emails
-
-### Supported Email Types
-
-- Customer Processing Order emails
-- Customer Pending Order emails
-- Admin emails for pending orders
-- Custom email types that trigger the hook
-
-## Conditional Activation
-
-You can conditionally enable the feature based on specific criteria:
+### Headers
 
 ```php
-/**
- * Enable email integration only for specific order types
- */
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order = null) {
-    // Enable only for orders over $100
-    if ($order && $order->get_total() > 100) {
-        return true;
-    }
-
-    return $enabled;
-}, 10, 2);
+add_filter(
+    'wicket_guest_payment_email_headers',
+    function (array $headers, $order, $token, $placeholders, $recipient_email, $user_data) {
+        $headers[] = 'Reply-To: billing@example.com';
+        return $headers;
+    },
+    10,
+    6
+);
 ```
 
-```php
-/**
- * Enable for specific user roles only
- */
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled) {
-    // Check if current user has specific role
-    if (current_user_can('manage_woocommerce')) {
-        return true;
-    }
+### Optional Sanitization
 
-    return $enabled;
+By default, sanitization is off to allow full HTML control.
+
+```php
+add_filter('wicket_guest_payment_email_sanitize_html', '__return_true');
+```
+
+Optionally control allowed tags:
+
+```php
+add_filter('wicket_guest_payment_email_allowed_html', function (array $allowed_html) {
+    $allowed_html['img'] = [
+        'src' => true,
+        'alt' => true,
+        'style' => true,
+    ];
+
+    return $allowed_html;
 });
 ```
 
-```php
-/**
- * Enable for specific products only
- */
-add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $order = null) {
-    if (!$order) {
-        return $enabled;
-    }
+## Token Expiry
 
-    // Check if order contains specific products
-    $target_products = [123, 456, 789]; // Product IDs
+Configured value is applied to token generation via:
 
-    foreach ($order->get_items() as $item) {
-        if ($item instanceof WC_Order_Item_Product) {
-            $product_id = $item->get_product_id();
-            if (in_array($product_id, $target_products)) {
-                return true;
-            }
-        }
-    }
-
-    return $enabled;
-}, 10, 2);
-```
-
-## Token Security
-
-- **Encryption:** AES-256-CBC encryption for token data
-- **Validation:** HMAC-SHA256 hash validation
-- **Expiry:** Tokens expire after 7 days (configurable)
-- **Single-use:** Tokens are invalidated after payment completion
-
-### Custom Token Expiry
-
-You can customize the token expiry period:
+- Wicket setting: `wicket_admin_settings_guest_payment_token_expiry_days`
+- Filter: `wicket/wooguestpay/token_expiry_days`
 
 ```php
-/**
- * Set custom token expiry for email integration
- */
-add_filter('wicket/wooguestpay/token_expiry_days', function($days) {
-    return 14; // Extend to 14 days
-});
+add_filter('wicket/wooguestpay/token_expiry_days', fn ($days) => 14);
 ```
 
 ## Troubleshooting
 
-### Emails Not Showing Guest Payment Links
+### Guest message not appearing in WooCommerce emails
 
-1. **Check if integration is enabled:**
-   ```php
-   var_dump(apply_filters('wicket/wooguestpay/email_integration_enabled', false));
-   ```
-
-2. **Verify order status is "pending"**
-   ```php
-   // In email context
-   if ($order && $order->get_status() === 'pending') {
-       // Should show links
-   }
-   ```
-
-3. **Check email hook is being triggered**
-   ```php
-   // Debug hook execution
-   add_action('woocommerce_email_before_order_table', function($order, $sent_to_admin, $plain_text, $email) {
-       error_log('Email hook triggered for order: ' . $order->get_id());
-   }, 5, 4);
-   ```
-
-### Tokens Not Generated
-
-1. **Check Core class is loaded:**
-   ```php
-   $main_plugin = WicketGuestPayment::get_instance();
-   $core = $main_plugin->get_core();
-   var_dump($core instanceof WicketGuestPaymentCore);
-   ```
-
-2. **Verify order has billing email:**
-   ```php
-   $billing_email = $order->get_billing_email();
-   var_dump(is_email($billing_email));
-   ```
-
-## Performance Considerations
-
-- **Tokens are generated on-demand** - no performance impact when disabled
-- **Cached after generation** - subsequent requests use existing tokens
-- **Minimal overhead** - only processes pending order emails
-- **Database queries** - uses existing order meta (no additional queries)
-
-## Debug Mode
-
-Enable debug logging for troubleshooting:
+1. Ensure feature is enabled:
 
 ```php
-/**
- * Enable debug mode for email integration
- */
-define('WICKET_GUEST_PAYMENT_DEBUG', true);
-
-// Check logs in: WooCommerce > Status > Logs
+var_dump(apply_filters('wicket/wooguestpay/email_integration_enabled', false));
 ```
 
-## Related Documentation
+2. Ensure order status is `pending`.
 
-- [PDF Integration Configuration](pdf-integration.md) - Configure PDF invoice integration
-- [Token Security](security.md) - Token generation and security details
-- [Advanced Configuration](advanced-config.md) - Additional configuration options
+3. Ensure the WooCommerce email template triggers `woocommerce_email_before_order_table`.
+
+### Admin-sent email not using expected template
+
+1. Confirm values are saved in **Wicket -> Settings -> Integrations -> Guest Checkout**.
+2. Check for overrides via filters (`wicket_guest_payment_email_subject`, `wicket_guest_payment_email_content`).
+3. If HTML is being stripped, verify `wicket_guest_payment_email_sanitize_html` is not forced to `true` by custom code.
+
+## Related Docs
+
+- [Configuration Quick Reference](configuration-quick-reference.md)
+- [Email Template Customization](email-template-customization.md)
+- [PDF Integration Configuration](pdf-integration.md)
