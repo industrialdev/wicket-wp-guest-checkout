@@ -10,7 +10,7 @@
 $rules = [
     '@PSR12' => true,
     '@PER-CS' => true,
-    '@PHP83Migration' => true,
+    '@PHP82Migration' => true,
     'array_syntax' => ['syntax' => 'short'],
     'binary_operator_spaces' => [
         'default' => 'single_space',
@@ -143,16 +143,16 @@ $rules = [
 
 $finder = PhpCsFixer\Finder::create()
     ->exclude([
-        '.ci',
-        'node_modules',
-        'vendor',
-        'docs',
-        'languages',
-        'dist',
+    '.ci',
+    'node_modules',
+    'vendor',
+    'docs',
+    'languages',
+    'dist',
     ])
     ->name('*.php')
     ->notName([
-        'composer.lock',
+    'composer.lock',
     ])
     ->ignoreDotFiles(true)
     ->in(__DIR__);

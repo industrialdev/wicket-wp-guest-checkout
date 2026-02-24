@@ -329,7 +329,8 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
         $lines = [];
         foreach ($order->get_items() as $item) {
             if ($item instanceof WC_Order_Item_Product) {
-                $lines[] = sprintf('<li>%1$s x %2$d - %3$s</li>',
+                $lines[] = sprintf(
+                    '<li>%1$s x %2$d - %3$s</li>',
                     esc_html($item->get_name()),
                     (int) $item->get_quantity(),
                     esc_html(strip_tags((string) wc_price($item->get_total())))

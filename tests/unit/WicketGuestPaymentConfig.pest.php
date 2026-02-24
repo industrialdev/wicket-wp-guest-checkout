@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Brain\Monkey;
 
-if (!class_exists( 'WP_Error')) {
+if (!class_exists('WP_Error')) {
     class WP_Error
     {
         public function __construct(string $code = '', string $message = '', $data = null) {}
@@ -176,7 +176,7 @@ it('extends integrations tab callback and adds guest checkout section', function
     expect($names)->toContain('wicket_admin_settings_guest_payment_token_expiry_days');
     expect($names)->toContain('wicket_admin_settings_guest_payment_email_subject_template');
     expect($names)->toContain('wicket_admin_settings_guest_payment_email_body_template');
-    expect($options[2]['type'])->toBe('wp-editor');
+    expect($options[2]['type'])->toBe('code-editor');
 });
 
 it('adds code-wrapped placeholders and media guidance in integrations field descriptions', function (): void {

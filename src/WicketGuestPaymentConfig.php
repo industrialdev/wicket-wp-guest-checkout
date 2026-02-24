@@ -310,7 +310,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             'default' => $this->get_default_email_subject_template(),
         ]);
 
-        $section->add_option('wp-editor', [
+        $section->add_option('code-editor', [
             'name' => self::OPTION_WICKET_EMAIL_BODY_TEMPLATE,
             'label' => __('Email Body Template', 'wicket-wgc'),
             'description' => sprintf(
@@ -322,12 +322,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 esc_html('<img src="{Image-URL}" alt="Logo" style="max-width:200px;height:auto;">')
             ),
             'default' => $this->get_default_email_body_template(),
-            'wpautop' => false,
-            'media_buttons' => false,
-            'tinymce' => false,
-            'quicktags' => true,
-            'default_editor' => 'html',
-            'textarea_rows' => 16,
+            'editor_type' => 'text/html',
         ]);
     }
 

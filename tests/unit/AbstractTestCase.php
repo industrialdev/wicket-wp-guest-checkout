@@ -83,6 +83,7 @@ abstract class AbstractTestCase extends PHPUnitTestCase
             'wp_clear_auth_cookie',
             'is_ssl' => false,
             'wp_doing_ajax' => false,
+            'is_wc_endpoint_url' => false,
             'is_checkout' => false,
             'is_cart' => false,
             'get_userdata',
