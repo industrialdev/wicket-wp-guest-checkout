@@ -369,27 +369,27 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
         }
 
         $template = '
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-			<title>' . esc_html(get_bloginfo('name')) . '</title>
-		</head>
-		<body style="background-color: #f5f5f5; font-family: Arial, sans-serif; margin: 0; padding: 0;">
-			<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-				<div style="background-color: #ffffff; padding: 40px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-					' . $logo . '
-					<div style="color: #555555; line-height: 1.6; font-size: 16px;">
-						' . $content . '
-					</div>
-				</div>
-				<div style="text-align: center; padding: 20px; color: #999999; font-size: 12px;">
-					<p>&copy; ' . date('Y') . ' ' . esc_html(get_bloginfo('name')) . '. ' . __('All rights reserved.', 'wicket-wgc') . '</p>
-				</div>
-			</div>
-		</body>
-		</html>
-		';
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+            <title>' . esc_html(get_bloginfo('name')) . '</title>
+        </head>
+        <body style="background-color: #f5f5f5; font-family: Arial, sans-serif; margin: 0; padding: 0;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #ffffff; padding: 40px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    ' . $logo . '
+                    <div style="color: #555555; line-height: 1.6; font-size: 16px; word-wrap: break-word; overflow-wrap: anywhere; word-break: break-word;">
+                        ' . $content . '
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 20px; color: #999999; font-size: 12px;">
+                    <p>&copy; ' . date('Y') . ' ' . esc_html(get_bloginfo('name')) . '. ' . __('All rights reserved.', 'wicket-wgc') . '</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        ';
 
         return $template;
     }

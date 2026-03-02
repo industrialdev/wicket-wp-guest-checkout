@@ -45,6 +45,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         $this->register_configuration_filters();
         $this->register_plugin_action_links();
         $this->register_wicket_settings();
+        $this->register_settings_linting();
     }
 
     /**
@@ -83,6 +84,61 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     {
         add_filter('wicket_settings_tabs', [$this, 'extend_wicket_settings_tabs'], 20, 1);
         add_filter('wicket_settings_tab_int', [$this, 'extend_wicket_integrations_tab'], 20, 1);
+    }
+
+    /**
+     * Register linting for Wicket settings save flow.
+     *
+     * @return void
+     */
+    private function register_settings_linting(): void
+    {
+        add_filter('pre_update_option_wicket_settings', [$this, 'lint_wicket_settings_before_save'], 10, 3);
+    }
+
+    /**
+     * Validate known template pitfalls and show admin warning on save.
+     *
+     * @param mixed  $value Incoming wicket_settings option value.
+     * @param mixed  $old_value Previous wicket_settings option value.
+     * @param string $option Option name.
+     * @return mixed
+     */
+    public function lint_wicket_settings_before_save($value, $old_value, string $option)
+    {
+        if ('wicket_settings' !== $option || !is_array($value)) {
+            return $value;
+        }
+
+        $template = (string) ($value[self::OPTION_WICKET_EMAIL_BODY_TEMPLATE] ?? '');
+        if (!$this->template_uses_payment_link_in_href($template)) {
+            return $value;
+        }
+
+        if (function_exists('add_settings_error')) {
+            add_settings_error(
+                'wicket_settings',
+                'wicket_wgc_email_template_payment_link_href',
+                __(
+                    'Guest Checkout email template warning: use {payment_url} in href attributes. {payment_link} already renders a full <a> element.',
+                    'wicket-wgc'
+                ),
+                'warning'
+            );
+        }
+
+        return $value;
+    }
+
+    /**
+     * Detect invalid use of {payment_link} as href value.
+     *
+     * @param string $template Email body template.
+     * @return bool
+     */
+    private function template_uses_payment_link_in_href(string $template): bool
+    {
+        return (bool) preg_match('/href\s*=\s*(["\'])\s*\{payment_link\}\s*\1/i', $template);
     }
 
     /**

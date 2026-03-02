@@ -47,6 +47,17 @@ if (!class_exists('WGP_Test_Tab')) {
     }
 }
 
+if (!function_exists('add_settings_error')) {
+    function add_settings_error(string $setting, string $code, string $message, string $type = 'error'): void
+    {
+        if (!isset($GLOBALS['wgp_test_settings_errors']) || !is_array($GLOBALS['wgp_test_settings_errors'])) {
+            $GLOBALS['wgp_test_settings_errors'] = [];
+        }
+
+        $GLOBALS['wgp_test_settings_errors'][] = compact('setting', 'code', 'message', 'type');
+    }
+}
+
 it('returns true when email integration option enabled', function (): void {
     $config = new WicketGuestPaymentConfig();
 
@@ -345,4 +356,34 @@ it('updates options when saving configuration including templates', function ():
     ]);
 
     expect($result)->toBeTrue();
+});
+
+it('adds warning when wicket email template uses payment_link in href attribute', function (): void {
+    $config = new WicketGuestPaymentConfig();
+    $GLOBALS['wgp_test_settings_errors'] = [];
+
+    Monkey\Functions\when('__')->alias(fn (string $value, string $domain = '') => $value);
+
+    $value = [
+        'wicket_admin_settings_guest_payment_email_body_template' => '<a href="{payment_link}">Complete Payment</a>',
+    ];
+    $result = $config->lint_wicket_settings_before_save($value, [], 'wicket_settings');
+
+    expect($result)->toBe($value);
+    expect($GLOBALS['wgp_test_settings_errors'])->toHaveCount(1);
+    expect($GLOBALS['wgp_test_settings_errors'][0]['setting'])->toBe('wicket_settings');
+    expect($GLOBALS['wgp_test_settings_errors'][0]['code'])->toBe('wicket_wgc_email_template_payment_link_href');
+    expect($GLOBALS['wgp_test_settings_errors'][0]['type'])->toBe('warning');
+});
+
+it('does not add warning when template uses payment_url in href attribute', function (): void {
+    $config = new WicketGuestPaymentConfig();
+    $GLOBALS['wgp_test_settings_errors'] = [];
+
+    $value = [
+        'wicket_admin_settings_guest_payment_email_body_template' => '<a href="{payment_url}">Complete Payment</a>',
+    ];
+    $config->lint_wicket_settings_before_save($value, [], 'wicket_settings');
+
+    expect($GLOBALS['wgp_test_settings_errors'])->toBe([]);
 });
