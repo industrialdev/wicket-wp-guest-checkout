@@ -102,7 +102,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Check if this is a guest payment session
         if (!$this->is_guest_payment_session_active()) {
-            $this->log('force_reuse_guest_payment_order: Guest session cookie not set. Allowing WC to create new order.');
+            $this->log(
+                sprintf(
+                    'force_reuse_guest_payment_order: Guest session not active. Allowing WC to create new order. (guest_cookie: %s, request_uri: %s)',
+                    isset($_COOKIE[self::GUEST_SESSION_COOKIE]) ? 'yes' : 'no',
+                    isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A'
+                )
+            );
 
             return $order_id ? (int) $order_id : 0;
         }
@@ -845,6 +851,21 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $is_guest_session = $this->is_guest_payment_session_active();
 
         if ($is_guest_session) {
+            // Some SSO stacks route through "/?referrer=..." and render home without forwarding.
+            // If the referrer target is one of our allowed guest-payment destinations, force the hop.
+            $guest_referrer_target = $this->get_allowed_guest_referrer_target_url();
+            if (null !== $guest_referrer_target && !is_cart() && !is_checkout() && !is_wc_endpoint_url('order-pay')) {
+                $this->log(
+                    sprintf(
+                        'Guest session referrer bridge detected. Redirecting to referrer target. (request_uri: %s, target: %s)',
+                        isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A',
+                        esc_url_raw($guest_referrer_target)
+                    )
+                );
+                wp_safe_redirect($guest_referrer_target);
+                $this->maybe_exit();
+            }
+
             //$this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
 
             // Add Logging for Conditional Tags
@@ -867,7 +888,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             $is_allowed_page = is_checkout()
                 || is_wc_endpoint_url('order-pay')
                 || is_cart()
-                || $this->is_allowed_guest_referrer_target()
+                || null !== $guest_referrer_target
                 || wp_doing_ajax()
                 || (defined('REST_REQUEST') && REST_REQUEST);
 
@@ -891,26 +912,34 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      *
      * @return bool
      */
-    private function is_allowed_guest_referrer_target(): bool
+    private function get_allowed_guest_referrer_target_url(): ?string
     {
         if (empty($_GET['referrer'])) {
-            return false;
+            return null;
         }
 
         $referrer = sanitize_text_field(wp_unslash((string) $_GET['referrer']));
         if ('' === $referrer) {
-            return false;
+            return null;
         }
 
         $parsed_referrer = parse_url($referrer);
         if (!is_array($parsed_referrer)) {
-            return false;
+            return null;
         }
 
         if (!empty($parsed_referrer['host'])) {
             $current_host = parse_url(home_url('/'), PHP_URL_HOST);
             if (!is_string($current_host) || '' === $current_host || strtolower($parsed_referrer['host']) !== strtolower($current_host)) {
-                return false;
+                $this->log(
+                    sprintf(
+                        'Guest referrer target rejected due to host mismatch. (referrer_host: %s, current_host: %s)',
+                        isset($parsed_referrer['host']) ? sanitize_text_field((string) $parsed_referrer['host']) : 'N/A',
+                        is_string($current_host) ? sanitize_text_field($current_host) : 'N/A'
+                    )
+                );
+
+                return null;
             }
         }
 
@@ -920,15 +949,30 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $checkout_path = untrailingslashit((string) parse_url(wc_get_checkout_url(), PHP_URL_PATH));
 
         if ('' !== $cart_path && '' !== $referrer_path && $referrer_path === $cart_path) {
-            return true;
+            $this->log(
+                sprintf('Guest referrer target accepted as cart path. (target: %s)', esc_url_raw($referrer)),
+                'debug'
+            );
+
+            return $referrer;
         }
 
         if ('' !== $checkout_path && '' !== $referrer_path && $referrer_path === $checkout_path) {
-            return true;
+            $this->log(
+                sprintf('Guest referrer target accepted as checkout path. (target: %s)', esc_url_raw($referrer)),
+                'debug'
+            );
+
+            return $referrer;
         }
 
         if ('' !== $checkout_path && '' !== $referrer_path && str_starts_with($referrer_path, $checkout_path . '/order-pay')) {
-            return true;
+            $this->log(
+                sprintf('Guest referrer target accepted as order-pay path. (target: %s)', esc_url_raw($referrer)),
+                'debug'
+            );
+
+            return $referrer;
         }
 
         if (!empty($parsed_referrer['query'])) {
@@ -946,12 +990,22 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 $checkout_page_id = wc_get_page_id('checkout');
 
                 if ($referrer_page_id === (int) $cart_page_id || $referrer_page_id === (int) $checkout_page_id) {
-                    return true;
+                    $this->log(
+                        sprintf('Guest referrer target accepted by page id match. (target: %s, referrer_page_id: %d)', esc_url_raw($referrer), $referrer_page_id),
+                        'debug'
+                    );
+
+                    return $referrer;
                 }
             }
         }
 
-        return false;
+        $this->log(
+            sprintf('Guest referrer target present but not allowed by guest flow. (target: %s)', esc_url_raw($referrer)),
+            'debug'
+        );
+
+        return null;
     }
 
     /**

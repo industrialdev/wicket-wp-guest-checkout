@@ -729,9 +729,14 @@ it('allows same-site cart referrer hop for guest session', function (): void {
     Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/cart/');
     Monkey\Functions\when('wc_get_checkout_url')->justReturn('https://example.com/checkout/');
     Monkey\Functions\when('home_url')->justReturn('https://example.com/');
-    Monkey\Functions\expect('wp_safe_redirect')->never();
+    $redirect_url = null;
+    Monkey\Functions\when('wp_safe_redirect')->alias(function (string $url) use (&$redirect_url): void {
+        $redirect_url = $url;
+    });
 
     $this->auth->handle_guest_authentication_and_restriction();
+
+    expect($redirect_url)->toBe('/cart/?wgp_cart_key=abc123');
 
     unset($_COOKIE['wordpress_logged_in_order'], $_GET['referrer']);
 });
@@ -762,9 +767,14 @@ it('allows same-site cart referrer hop by page id for guest session', function (
         return -1;
     });
     Monkey\Functions\when('home_url')->justReturn('https://example.com/');
-    Monkey\Functions\expect('wp_safe_redirect')->never();
+    $redirect_url = null;
+    Monkey\Functions\when('wp_safe_redirect')->alias(function (string $url) use (&$redirect_url): void {
+        $redirect_url = $url;
+    });
 
     $this->auth->handle_guest_authentication_and_restriction();
+
+    expect($redirect_url)->toBe('/?p=41');
 
     unset($_COOKIE['wordpress_logged_in_order'], $_GET['referrer']);
 });
