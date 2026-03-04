@@ -29,6 +29,16 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     private const GUEST_SESSION_COOKIE = 'wordpress_logged_in_order';
 
     /**
+     * Cookie used to prevent infinite referrer bridge redirect loops.
+     */
+    private const REFERRER_BRIDGE_COOKIE = 'wgp_referrer_bridge_target';
+
+    /**
+     * Loop guard TTL in seconds for repeated referrer bridge redirects.
+     */
+    private const REFERRER_BRIDGE_TTL_SECONDS = 30;
+
+    /**
      * Maximum number of failed token validation attempts before lockout.
      */
     private const MAX_FAILED_ATTEMPTS = 5;
@@ -382,6 +392,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             ]);
 
             //$this->log('Cleared guest session flag cookie on logout.');
+        }
+
+        if (isset($_COOKIE[self::REFERRER_BRIDGE_COOKIE])) {
+            setcookie(self::REFERRER_BRIDGE_COOKIE, '', [
+                'expires' => time() - HOUR_IN_SECONDS,
+                'path' => COOKIEPATH,
+                'domain' => COOKIE_DOMAIN,
+                'secure' => is_ssl(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
         }
     }
 
@@ -855,15 +876,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             // If the referrer target is one of our allowed guest-payment destinations, force the hop.
             $guest_referrer_target = $this->get_allowed_guest_referrer_target_url();
             if (null !== $guest_referrer_target && !is_cart() && !is_checkout() && !is_wc_endpoint_url('order-pay')) {
-                $this->log(
-                    sprintf(
-                        'Guest session referrer bridge detected. Redirecting to referrer target. (request_uri: %s, target: %s)',
-                        isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A',
-                        esc_url_raw($guest_referrer_target)
-                    )
-                );
-                wp_safe_redirect($guest_referrer_target);
-                $this->maybe_exit();
+                if ($this->should_run_referrer_bridge_redirect($guest_referrer_target)) {
+                    $this->log(
+                        sprintf(
+                            'Guest session referrer bridge detected. Redirecting to referrer target. (request_uri: %s, target: %s)',
+                            isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A',
+                            esc_url_raw($guest_referrer_target)
+                        )
+                    );
+                    wp_safe_redirect($guest_referrer_target);
+                    $this->maybe_exit();
+                }
             }
 
             //$this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
@@ -1266,6 +1289,43 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         return sanitize_text_field($ip);
+    }
+
+    /**
+     * Prevent repetitive redirects between "/?referrer=..." and cart/checkout targets.
+     *
+     * @param string $target_url Target URL extracted from referrer.
+     * @return bool True when redirect should proceed, false when suppressed to break loop.
+     */
+    private function should_run_referrer_bridge_redirect(string $target_url): bool
+    {
+        $target_hash = hash('sha256', $target_url);
+        $last_target_hash = isset($_COOKIE[self::REFERRER_BRIDGE_COOKIE])
+            ? sanitize_text_field(wp_unslash((string) $_COOKIE[self::REFERRER_BRIDGE_COOKIE]))
+            : '';
+
+        if ('' !== $last_target_hash && hash_equals($last_target_hash, $target_hash)) {
+            $this->log(
+                sprintf(
+                    'Guest session referrer bridge suppressed to prevent redirect loop. (request_uri: %s, target: %s)',
+                    isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A',
+                    esc_url_raw($target_url)
+                )
+            );
+
+            return false;
+        }
+
+        setcookie(self::REFERRER_BRIDGE_COOKIE, $target_hash, [
+            'expires' => time() + self::REFERRER_BRIDGE_TTL_SECONDS,
+            'path' => COOKIEPATH,
+            'domain' => COOKIE_DOMAIN,
+            'secure' => is_ssl(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+
+        return true;
     }
 
     /**
