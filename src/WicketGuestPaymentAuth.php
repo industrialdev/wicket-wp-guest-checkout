@@ -862,10 +862,12 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             // End Logging
             // End Logging
 
-            // Allow access only to checkout, order-pay endpoint, cart, AJAX requests, OR REST API requests
+            // Allow access only to checkout, order-pay endpoint, cart, trusted cart/checkout referrer hops,
+            // AJAX requests, or REST API requests.
             $is_allowed_page = is_checkout()
                 || is_wc_endpoint_url('order-pay')
                 || is_cart()
+                || $this->is_allowed_guest_referrer_target()
                 || wp_doing_ajax()
                 || (defined('REST_REQUEST') && REST_REQUEST);
 
@@ -875,12 +877,64 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 // Redirect to cart
                 wp_safe_redirect(wc_get_cart_url());
                 $this->maybe_exit();
-                wp_safe_redirect(wc_get_cart_url());
-                $this->maybe_exit();
             } else {
                 //$this->log('Access allowed for guest session on current page (URL: ' . (isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : 'N/A') . ').');
             }
         }
+    }
+
+    /**
+     * Allow same-site login referrer hops that target guest-payment allowed pages.
+     *
+     * Some auth/membership stacks briefly route through "/?referrer=..." before returning
+     * to cart/checkout, which would otherwise be misclassified as restricted.
+     *
+     * @return bool
+     */
+    private function is_allowed_guest_referrer_target(): bool
+    {
+        if (empty($_GET['referrer'])) {
+            return false;
+        }
+
+        $referrer = sanitize_text_field(wp_unslash((string) $_GET['referrer']));
+        if ('' === $referrer) {
+            return false;
+        }
+
+        $parsed_referrer = parse_url($referrer);
+        if (!is_array($parsed_referrer)) {
+            return false;
+        }
+
+        if (!empty($parsed_referrer['host'])) {
+            $current_host = parse_url(home_url('/'), PHP_URL_HOST);
+            if (!is_string($current_host) || '' === $current_host || strtolower($parsed_referrer['host']) !== strtolower($current_host)) {
+                return false;
+            }
+        }
+
+        $referrer_path = isset($parsed_referrer['path']) ? untrailingslashit((string) $parsed_referrer['path']) : '';
+        if ('' === $referrer_path) {
+            return false;
+        }
+
+        $cart_path = untrailingslashit((string) parse_url(wc_get_cart_url(), PHP_URL_PATH));
+        $checkout_path = untrailingslashit((string) parse_url(wc_get_checkout_url(), PHP_URL_PATH));
+
+        if ('' !== $cart_path && $referrer_path === $cart_path) {
+            return true;
+        }
+
+        if ('' !== $checkout_path && $referrer_path === $checkout_path) {
+            return true;
+        }
+
+        if ('' !== $checkout_path && str_starts_with($referrer_path, $checkout_path . '/order-pay')) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
