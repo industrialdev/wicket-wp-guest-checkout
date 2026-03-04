@@ -526,11 +526,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
-        // Check if there's a guest payment token in the URL and the user is logged in
-        if (isset($_GET['guest_payment_token']) && is_user_logged_in()) {
-            // Get the token before logging out
-            $token = sanitize_text_field($_GET['guest_payment_token']);
+        $token = $this->extract_guest_payment_token_from_request();
 
+        // Check if there's a guest payment token in the URL and the user is logged in
+        if (!empty($token) && is_user_logged_in()) {
             // Clear auth cookies manually to ensure proper logout
             wp_clear_auth_cookie();
 
@@ -544,7 +543,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // Check if there's a guest payment token in the URL and user is not logged in
-        if (isset($_GET['guest_payment_token']) && !is_user_logged_in()) {
+        if (!empty($token) && !is_user_logged_in()) {
             //$this->log('=== GUEST PAYMENT TOKEN FLOW START ===');
             //$this->log(sprintf('Request URI: %s', $_SERVER['REQUEST_URI'] ?? 'unknown'));
 
@@ -563,8 +562,6 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     WC()->session->set_customer_session_cookie(true);
                 }
             }
-
-            $token = sanitize_text_field($_GET['guest_payment_token']);
 
             //$this->log('Guest payment token found in URL. Attempting validation.');
 

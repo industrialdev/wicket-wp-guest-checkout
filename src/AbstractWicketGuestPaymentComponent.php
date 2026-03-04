@@ -81,4 +81,48 @@ abstract class AbstractWicketGuestPaymentComponent
 
         exit;
     }
+
+    /**
+     * Extract a guest payment token from either direct query params or a login redirect referrer.
+     *
+     * @return string|null
+     */
+    protected function extract_guest_payment_token_from_request(): ?string
+    {
+        if (!empty($_GET['guest_payment_token'])) {
+            $token = sanitize_text_field(wp_unslash((string) $_GET['guest_payment_token']));
+
+            return '' !== $token ? $token : null;
+        }
+
+        if (empty($_GET['referrer'])) {
+            return null;
+        }
+
+        $referrer = sanitize_text_field(wp_unslash((string) $_GET['referrer']));
+        if ('' === $referrer) {
+            return null;
+        }
+
+        $parsed_referrer = parse_url($referrer);
+        if (!is_array($parsed_referrer) || empty($parsed_referrer['query'])) {
+            return null;
+        }
+
+        if (!empty($parsed_referrer['host'])) {
+            $current_host = parse_url(home_url('/'), PHP_URL_HOST);
+            if (!is_string($current_host) || '' === $current_host || strtolower($parsed_referrer['host']) !== strtolower($current_host)) {
+                return null;
+            }
+        }
+
+        parse_str($parsed_referrer['query'], $referrer_query);
+        if (empty($referrer_query['guest_payment_token'])) {
+            return null;
+        }
+
+        $token = sanitize_text_field((string) $referrer_query['guest_payment_token']);
+
+        return '' !== $token ? $token : null;
+    }
 }

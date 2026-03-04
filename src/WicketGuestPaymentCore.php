@@ -141,8 +141,10 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      */
     public function handle_guest_token_request(): void
     {
+        $token = $this->extract_guest_payment_token_from_request();
+
         // Check if the token parameter exists in the URL
-        if (empty($_GET['guest_payment_token'])) {
+        if (empty($token)) {
             return; // No token present, do nothing
         }
 
@@ -154,9 +156,6 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
             return;
         }
-
-        // Sanitize the token
-        $token = sanitize_text_field(wp_unslash($_GET['guest_payment_token']));
 
         // Validate the token and get the associated order
         $order = $this->validate_token($token); // Logging added inside this method now

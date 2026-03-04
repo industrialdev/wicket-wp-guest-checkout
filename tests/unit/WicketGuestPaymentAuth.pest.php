@@ -657,6 +657,42 @@ it('redirects logged-in users with token', function (): void {
     unset($_GET['guest_payment_token']);
 });
 
+it('extracts token from referrer query payload', function (): void {
+    $_GET['referrer'] = '/cart/?guest_payment_token=token-from-referrer';
+
+    Monkey\Functions\when('home_url')->justReturn('https://example.com/');
+    Monkey\Functions\when('sanitize_text_field')->returnArg();
+    Monkey\Functions\when('wp_unslash')->returnArg();
+
+    $getter = function (): ?string {
+        return $this->extract_guest_payment_token_from_request();
+    };
+    $bound_getter = $getter->bindTo($this->auth, WicketGuestPaymentAuth::class);
+    $result = $bound_getter();
+
+    expect($result)->toBe('token-from-referrer');
+
+    unset($_GET['referrer']);
+});
+
+it('ignores referrer token from a different host', function (): void {
+    $_GET['referrer'] = 'https://malicious.example/cart/?guest_payment_token=bad-token';
+
+    Monkey\Functions\when('home_url')->justReturn('https://example.com/');
+    Monkey\Functions\when('sanitize_text_field')->returnArg();
+    Monkey\Functions\when('wp_unslash')->returnArg();
+
+    $getter = function (): ?string {
+        return $this->extract_guest_payment_token_from_request();
+    };
+    $bound_getter = $getter->bindTo($this->auth, WicketGuestPaymentAuth::class);
+    $result = $bound_getter();
+
+    expect($result)->toBeNull();
+
+    unset($_GET['referrer']);
+});
+
 it('allows checkout for guest session', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
 
