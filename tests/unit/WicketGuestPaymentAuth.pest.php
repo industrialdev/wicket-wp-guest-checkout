@@ -313,10 +313,13 @@ it('blocks checkout when order missing', function (): void {
 it('returns early when no guest session cookie before checkout', function (): void {
     unset($_COOKIE['wordpress_logged_in_order']);
 
-    Monkey\Functions\when('get_current_user_id')->justReturn(55);
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $core->shouldReceive('is_guest_payment_session')->once()->andReturn(false);
+    $auth = new WicketGuestPaymentAuth($core);
+
     Monkey\Functions\expect('wc_add_notice')->never();
 
-    $this->auth->validate_guest_payment_order_before_checkout();
+    $auth->validate_guest_payment_order_before_checkout();
 
     expect(true)->toBeTrue();
 });
@@ -733,6 +736,39 @@ it('allows same-site cart referrer hop for guest session', function (): void {
     unset($_COOKIE['wordpress_logged_in_order'], $_GET['referrer']);
 });
 
+it('allows same-site cart referrer hop by page id for guest session', function (): void {
+    $_COOKIE['wordpress_logged_in_order'] = '1';
+    $_GET['referrer'] = '/?p=41';
+
+    Monkey\Functions\when('is_admin')->justReturn(false);
+    Monkey\Functions\when('is_user_logged_in')->justReturn(false);
+    Monkey\Functions\when('is_checkout')->justReturn(false);
+    Monkey\Functions\when('is_cart')->justReturn(false);
+    Monkey\Functions\when('is_wc_endpoint_url')->justReturn(false);
+    Monkey\Functions\when('wp_doing_ajax')->justReturn(false);
+    Monkey\Functions\when('sanitize_text_field')->returnArg();
+    Monkey\Functions\when('wp_unslash')->returnArg();
+    Monkey\Functions\when('wc_get_cart_url')->justReturn('https://example.com/?p=41');
+    Monkey\Functions\when('wc_get_checkout_url')->justReturn('https://example.com/?p=42');
+    Monkey\Functions\when('wc_get_page_id')->alias(function (string $page): int {
+        if ($page === 'cart') {
+            return 41;
+        }
+
+        if ($page === 'checkout') {
+            return 42;
+        }
+
+        return -1;
+    });
+    Monkey\Functions\when('home_url')->justReturn('https://example.com/');
+    Monkey\Functions\expect('wp_safe_redirect')->never();
+
+    $this->auth->handle_guest_authentication_and_restriction();
+
+    unset($_COOKIE['wordpress_logged_in_order'], $_GET['referrer']);
+});
+
 it('redirects guest session on restricted page when referrer host is different', function (): void {
     $_COOKIE['wordpress_logged_in_order'] = '1';
     $_GET['referrer'] = 'https://malicious.example/cart/';
@@ -763,6 +799,7 @@ it('redirects guest session on restricted page when referrer host is different',
 
 it('cleans up after payment for guest sessions', function (): void {
     $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $core->shouldReceive('is_guest_payment_session')->once()->andReturn(true);
     $core->shouldReceive('invalidate_token_for_order')
         ->once()
         ->with(123);
@@ -1032,6 +1069,7 @@ it('noops when no error params present', function (): void {
 
 it('redirects guest users away from wp-admin', function (): void {
     $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $core->shouldReceive('is_guest_payment_session')->once()->andReturn(true);
     $auth = new WicketGuestPaymentAuth($core);
 
     $_COOKIE['wordpress_logged_in_order'] = '1';

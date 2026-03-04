@@ -101,7 +101,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         //$this->log(sprintf('force_reuse_guest_payment_order hook called. Input order_id: %s, WC session order_awaiting_payment: %s', $order_id ?? 'null', $wc_session_order ?? 'not_set'));
 
         // Check if this is a guest payment session
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        if (!$this->is_guest_payment_session_active()) {
             $this->log('force_reuse_guest_payment_order: Guest session cookie not set. Allowing WC to create new order.');
 
             return $order_id ? (int) $order_id : 0;
@@ -169,7 +169,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     public function validate_guest_payment_order_before_checkout(): void
     {
         // Only run for guest payment sessions
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        if (!$this->is_guest_payment_session_active()) {
             return;
         }
 
@@ -278,7 +278,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     public function validate_guest_payment_order_before_payment_block(WC_Order $order, WP_Error $validation_errors): void
     {
         // Only run for guest payment sessions
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        if (!$this->is_guest_payment_session_active()) {
             return;
         }
 
@@ -842,7 +842,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Restriction Part
         // Check if this is a guest payment session using only the cookie
-        $is_guest_session = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        $is_guest_session = $this->is_guest_payment_session_active();
 
         if ($is_guest_session) {
             //$this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
@@ -915,23 +915,40 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         $referrer_path = isset($parsed_referrer['path']) ? untrailingslashit((string) $parsed_referrer['path']) : '';
-        if ('' === $referrer_path) {
-            return false;
-        }
 
         $cart_path = untrailingslashit((string) parse_url(wc_get_cart_url(), PHP_URL_PATH));
         $checkout_path = untrailingslashit((string) parse_url(wc_get_checkout_url(), PHP_URL_PATH));
 
-        if ('' !== $cart_path && $referrer_path === $cart_path) {
+        if ('' !== $cart_path && '' !== $referrer_path && $referrer_path === $cart_path) {
             return true;
         }
 
-        if ('' !== $checkout_path && $referrer_path === $checkout_path) {
+        if ('' !== $checkout_path && '' !== $referrer_path && $referrer_path === $checkout_path) {
             return true;
         }
 
-        if ('' !== $checkout_path && str_starts_with($referrer_path, $checkout_path . '/order-pay')) {
+        if ('' !== $checkout_path && '' !== $referrer_path && str_starts_with($referrer_path, $checkout_path . '/order-pay')) {
             return true;
+        }
+
+        if (!empty($parsed_referrer['query'])) {
+            parse_str((string) $parsed_referrer['query'], $referrer_query);
+            $referrer_page_id = 0;
+
+            if (!empty($referrer_query['p']) && is_scalar($referrer_query['p'])) {
+                $referrer_page_id = absint((string) $referrer_query['p']);
+            } elseif (!empty($referrer_query['page_id']) && is_scalar($referrer_query['page_id'])) {
+                $referrer_page_id = absint((string) $referrer_query['page_id']);
+            }
+
+            if ($referrer_page_id > 0) {
+                $cart_page_id = wc_get_page_id('cart');
+                $checkout_page_id = wc_get_page_id('checkout');
+
+                if ($referrer_page_id === (int) $cart_page_id || $referrer_page_id === (int) $checkout_page_id) {
+                    return true;
+                }
+            }
         }
 
         return false;
@@ -947,7 +964,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     public function cleanup_after_payment(int $order_id): void
     {
         // Check if this was a guest payment session using the cookie
-        if (isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        if ($this->is_guest_payment_session_active()) {
             // Ensure no session variable is checked or cleared here
 
             // The $order_id passed here is for the NEW order just created by the checkout.
@@ -1144,7 +1161,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // Check if this is a guest session
-        if (isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        if ($this->is_guest_payment_session_active()) {
             // Clear auth cookies
             wp_clear_auth_cookie();
 
@@ -1168,7 +1185,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function maybe_hide_admin_bar(bool $show): bool
     {
-        $cookie_set = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        $cookie_set = $this->is_guest_payment_session_active();
 
         // If the guest session cookie is set, remove the theme's filter and hide the admin bar
         if ($cookie_set) {
@@ -1195,5 +1212,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         return sanitize_text_field($ip);
+    }
+
+    /**
+     * Determine if a guest payment session is active.
+     *
+     * Uses the core guard, which supports both cookie and validated user-meta fallback.
+     *
+     * @return bool
+     */
+    private function is_guest_payment_session_active(): bool
+    {
+        return $this->core->is_guest_payment_session();
     }
 }
