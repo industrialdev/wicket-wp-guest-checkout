@@ -378,7 +378,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         // These are stored as order item meta but never enter the WC cart
                         // session naturally (org_uuid is set post-cart via admin UI),
                         // causing them to be missing from new subscription line items.
-                        $org_uuid = $item->get_meta('_org_uuid', true);
+                        $org_uuid = $this->resolve_org_uuid_for_cart_item($order, $item);
                         if ($org_uuid) {
                             $cart[$cart_item_key]['org_uuid'] = $org_uuid;
                             $this->log(sprintf(
@@ -391,13 +391,13 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                             ), 'debug');
                         } else {
                             $this->log(sprintf(
-                                'prepare_cart_from_order: No _org_uuid found on order item %d (product_id: %d, order_id: %d) — cart item will not have org_uuid.',
+                                'prepare_cart_from_order: No _org_uuid found on order item or order-level meta for order item %d (product_id: %d, order_id: %d) — cart item will not have org_uuid.',
                                 $item_id,
                                 $product_id,
                                 $order->get_id()
                             ), 'debug');
                         }
-                        $membership_post_id_renew = $item->get_meta('_membership_post_id_renew', true);
+                        $membership_post_id_renew = $this->resolve_membership_post_id_renew_for_cart_item($order, $item);
                         if ($membership_post_id_renew) {
                             $cart[$cart_item_key]['membership_post_id_renew'] = $membership_post_id_renew;
                             $this->log(sprintf(
@@ -458,14 +458,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         'custom_price' => $order_item_total / ($quantity > 0 ? $quantity : 1), // Store unit price for before_calculate_totals
                         // Inject membership meta as top-level keys so Membership_Controller
                         // can find them via $values['org_uuid'] / $values['membership_post_id_renew'].
-                        'org_uuid'                 => $item->get_meta('_org_uuid', true) ?: null,
-                        'membership_post_id_renew' => $item->get_meta('_membership_post_id_renew', true) ?: null,
+                        'org_uuid'                 => $this->resolve_org_uuid_for_cart_item($order, $item) ?: null,
+                        'membership_post_id_renew' => $this->resolve_membership_post_id_renew_for_cart_item($order, $item) ?: null,
                     ];
 
                     $this->log(sprintf(
                         'prepare_cart_from_order (fallback path): Injecting org_uuid [%s], membership_post_id_renew [%s] for product_id %d (order_item_id: %d, order_id: %d).',
-                        $item->get_meta('_org_uuid', true) ?: 'empty',
-                        $item->get_meta('_membership_post_id_renew', true) ?: 'empty',
+                        $cart_item_data['org_uuid'] ?: 'empty',
+                        $cart_item_data['membership_post_id_renew'] ?: 'empty',
                         $product_id,
                         $item_id,
                         $order->get_id()
@@ -517,6 +517,83 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         return $items_added;
+    }
+
+    /**
+     * Resolve org UUID for a cart item, preferring line item meta and falling back to order-level meta.
+     * Uses Woo CRUD accessors for HPOS compatibility.
+     *
+     * @param WC_Order $order
+     * @param WC_Order_Item_Product $item
+     * @return string|null
+     */
+    private function resolve_org_uuid_for_cart_item(WC_Order $order, WC_Order_Item_Product $item): ?string
+    {
+        $item_org_uuid = $this->normalize_scalar_meta_value($item->get_meta('_org_uuid', true));
+        if (null !== $item_org_uuid) {
+            return $item_org_uuid;
+        }
+
+        $order_org_uuid = $this->normalize_scalar_meta_value($order->get_meta('_org_uuid', true));
+        if (null !== $order_org_uuid) {
+            return $order_org_uuid;
+        }
+
+        $order_wc_org_uuid = $order->get_meta('_wc_org_uuid', true);
+
+        if (is_string($order_wc_org_uuid) && '' !== trim($order_wc_org_uuid)) {
+            $unserialized = maybe_unserialize($order_wc_org_uuid);
+            if (is_array($unserialized) && !empty($unserialized['uuid'])) {
+                return $this->normalize_scalar_meta_value($unserialized['uuid']);
+            }
+
+            $decoded = json_decode($order_wc_org_uuid, true);
+            if (is_array($decoded) && !empty($decoded['uuid'])) {
+                return $this->normalize_scalar_meta_value($decoded['uuid']);
+            }
+        }
+
+        if (is_array($order_wc_org_uuid) && !empty($order_wc_org_uuid['uuid'])) {
+            return $this->normalize_scalar_meta_value($order_wc_org_uuid['uuid']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve renewal membership post id for a cart item, preferring line item meta and
+     * falling back to order-level meta.
+     * Uses Woo CRUD accessors for HPOS compatibility.
+     *
+     * @param WC_Order $order
+     * @param WC_Order_Item_Product $item
+     * @return string|null
+     */
+    private function resolve_membership_post_id_renew_for_cart_item(WC_Order $order, WC_Order_Item_Product $item): ?string
+    {
+        $item_membership_post_id_renew = $this->normalize_scalar_meta_value($item->get_meta('_membership_post_id_renew', true));
+        if (null !== $item_membership_post_id_renew) {
+            return $item_membership_post_id_renew;
+        }
+
+        return $this->normalize_scalar_meta_value($order->get_meta('_membership_post_id_renew', true));
+    }
+
+    /**
+     * Normalize scalar meta values to a trimmed string or null.
+     *
+     * @param mixed $value
+     * @return string|null
+     */
+    private function normalize_scalar_meta_value($value): ?string
+    {
+        if (is_array($value) || is_object($value) || null === $value) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+
+        return '' === $normalized ? null : $normalized;
     }
 
     /**
