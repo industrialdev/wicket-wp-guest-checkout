@@ -419,6 +419,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                             $variation_id = !empty($item_data['variation_id']) ? absint($item_data['variation_id']) : 0;
                             $quantity = !empty($item_data['quantity']) ? absint($item_data['quantity']) : 0;
 
+                            $this->log(sprintf(
+                                'Cart transient restore: item key %s — product_id: %d, org_uuid: [%s], membership_post_id_renew: [%s].',
+                                $item_key,
+                                $product_id,
+                                $item_data['org_uuid'] ?? 'NOT SET',
+                                $item_data['membership_post_id_renew'] ?? 'NOT SET'
+                            ), 'debug');
+
                             if ($product_id > 0 && $quantity > 0) {
                                 $_product = wc_get_product($variation_id ?: $product_id);
                                 if (!empty($item_data['custom_price'])) {
@@ -432,14 +440,27 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                         $cart[$cart_item_key] = $item_data;
                                         $cart[$cart_item_key]['data'] = $_product;
                                         WC()->cart->set_cart_contents($cart);
-
-                                        //$this->log(sprintf('Manually added product ID %d (Variation ID: %d) to cart during transient restore with custom price.', $product_id, $variation_id));
+                                        $this->log(sprintf(
+                                            'Cart transient restore (custom price path): product_id %d added with cart key %s — org_uuid: [%s], membership_post_id_renew: [%s].',
+                                            $product_id,
+                                            $cart_item_key,
+                                            $item_data['org_uuid'] ?? 'NOT SET',
+                                            $item_data['membership_post_id_renew'] ?? 'NOT SET'
+                                        ), 'debug');
                                     } else {
                                         // Add to cart directly to let WooCommerce handle creating the cart item data structure
                                         $cart_item_key = WC()->cart->add_to_cart($product_id, $quantity, $variation_id, $item_data['variation'] ?? [], $item_data);
 
                                         if (!$cart_item_key) {
                                             $this->log(sprintf('Failed to add product ID %d (Variation ID: %d) to cart during transient restore.', $product_id, $variation_id), 'warning');
+                                        } else {
+                                            $this->log(sprintf(
+                                                'Cart transient restore (add_to_cart path): product_id %d added with cart key %s — org_uuid: [%s], membership_post_id_renew: [%s].',
+                                                $product_id,
+                                                $cart_item_key,
+                                                $item_data['org_uuid'] ?? 'NOT SET',
+                                                $item_data['membership_post_id_renew'] ?? 'NOT SET'
+                                            ), 'debug');
                                         }
                                     }
                                 } else {
@@ -745,7 +766,18 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                     $secure_key = $this->get_plugin()->generate_secure_cart_key($customer_id);
                                     update_user_meta($customer_id, '_wgp_cart_key', $secure_key);
                                     $transient_key = 'wgp_cart_' . $secure_key;
-                                    set_transient($transient_key, WC()->cart->get_cart_for_session(), DAY_IN_SECONDS); // Increase expiry to 1 day
+                                    $cart_for_session = WC()->cart->get_cart_for_session();
+                                    set_transient($transient_key, $cart_for_session, DAY_IN_SECONDS); // Increase expiry to 1 day
+
+                                    foreach ($cart_for_session as $ckey => $citem) {
+                                        $this->log(sprintf(
+                                            'Cart transient save: item key %s — product_id: %d, org_uuid: [%s], membership_post_id_renew: [%s].',
+                                            $ckey,
+                                            $citem['product_id'] ?? 0,
+                                            $citem['org_uuid'] ?? 'NOT SET',
+                                            $citem['membership_post_id_renew'] ?? 'NOT SET'
+                                        ), 'debug');
+                                    }
 
                                     $redirect_url = add_query_arg('wgp_cart_key', $secure_key, wc_get_cart_url());
                                     //$this->log(sprintf('=== REDIRECTING TO: %s ===', $redirect_url));

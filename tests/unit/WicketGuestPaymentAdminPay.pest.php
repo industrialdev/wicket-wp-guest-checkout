@@ -36,7 +36,8 @@ function wgp_with_cookie(array $cookie, callable $callback): void
 }
 
 it('blocks admin pay when user is not admin', function (): void {
-    $handler = new WicketGuestPaymentAdminPay();
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $handler = new WicketGuestPaymentAdminPay($core);
 
     Monkey\Functions\when('absint')->alias(static fn ($value) => (int) $value);
     Monkey\Functions\when('sanitize_key')->alias(static fn ($value) => $value);
@@ -59,7 +60,8 @@ it('blocks admin pay when user is not admin', function (): void {
 });
 
 it('starts admin pay session for valid admin', function (): void {
-    $handler = new WicketGuestPaymentAdminPay();
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $handler = new WicketGuestPaymentAdminPay($core);
     $redirect_url = null;
 
     $order = new class extends WC_Order {
@@ -103,6 +105,10 @@ it('starts admin pay session for valid admin', function (): void {
 
     Monkey\Functions\expect('check_admin_referer')->once();
     Monkey\Functions\when('wc_get_order')->justReturn($order);
+    $core->shouldReceive('ensure_order_ready_for_guest_payment')
+        ->once()
+        ->with($order, 'admin_pay')
+        ->andReturn(true);
     Monkey\Functions\expect('set_transient')
         ->once()
         ->with(
@@ -129,8 +135,67 @@ it('starts admin pay session for valid admin', function (): void {
     expect($redirect_url)->toBe('https://example.com/pay');
 });
 
+it('blocks admin pay when order is not payable after preflight', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $handler = new WicketGuestPaymentAdminPay($core);
+    $error = new class {
+        public function get_error_message(): string
+        {
+            return 'Order is not payable.';
+        }
+    };
+
+    $order = new class extends WC_Order {
+        public function get_status(): string
+        {
+            return 'pending';
+        }
+
+        public function has_status(array $statuses): bool
+        {
+            return in_array('pending', $statuses, true);
+        }
+
+        public function needs_shipping(): bool
+        {
+            return false;
+        }
+    };
+
+    Monkey\Functions\when('absint')->alias(static fn ($value) => (int) $value);
+    Monkey\Functions\when('sanitize_key')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('wp_unslash')->alias(static fn ($value) => $value);
+    Monkey\Functions\when('get_current_user_id')->justReturn(99);
+    Monkey\Functions\when('get_userdata')->justReturn((object) [
+        'roles' => ['administrator'],
+        'display_name' => 'Admin User',
+    ]);
+    Monkey\Functions\when('user_can')->alias(static fn (int $user_id, string $capability): bool => $user_id === 99);
+
+    Monkey\Functions\expect('check_admin_referer')->once();
+    Monkey\Functions\when('wc_get_order')->justReturn($order);
+    Monkey\Functions\when('is_wp_error')->alias(static fn ($value) => $value === $error);
+    $core->shouldReceive('ensure_order_ready_for_guest_payment')
+        ->once()
+        ->with($order, 'admin_pay')
+        ->andReturn($error);
+
+    Monkey\Functions\expect('wp_die')
+        ->once()
+        ->andReturnUsing(function (): void {
+            throw new RuntimeException('wp_die');
+        });
+
+    expect(function () use ($handler): void {
+        wgp_with_get(['order_id' => 123], function () use ($handler): void {
+            $handler->handle_admin_pay_request();
+        });
+    })->toThrow(RuntimeException::class);
+});
+
 it('auto returns admin on thank you page', function (): void {
-    $handler = new WicketGuestPaymentAdminPay();
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $handler = new WicketGuestPaymentAdminPay($core);
     $redirect_url = null;
     $switched_user = null;
     $auth_user = null;

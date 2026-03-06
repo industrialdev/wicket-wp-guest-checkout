@@ -242,7 +242,7 @@ class WicketGuestPayment
         }
 
         // Initialize admin pay flow
-        $this->admin_pay = new WicketGuestPaymentAdminPay();
+        $this->admin_pay = new WicketGuestPaymentAdminPay($this->core);
         $this->admin_pay->init_hooks();
 
         // Initialize invoice integration

@@ -371,6 +371,44 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         if (!empty($variation_attributes)) {
                             $cart[$cart_item_key]['variation'] = $variation_attributes;
                         }
+
+                        // Inject membership meta as top-level cart item keys so
+                        // Membership_Controller::add_order_item_meta can find them
+                        // via $values['org_uuid'] and $values['membership_post_id_renew'].
+                        // These are stored as order item meta but never enter the WC cart
+                        // session naturally (org_uuid is set post-cart via admin UI),
+                        // causing them to be missing from new subscription line items.
+                        $org_uuid = $item->get_meta('_org_uuid', true);
+                        if ($org_uuid) {
+                            $cart[$cart_item_key]['org_uuid'] = $org_uuid;
+                            $this->log(sprintf(
+                                'prepare_cart_from_order: Injected org_uuid [%s] into cart item key %s (product_id: %d, order_item_id: %d, order_id: %d).',
+                                $org_uuid,
+                                $cart_item_key,
+                                $product_id,
+                                $item_id,
+                                $order->get_id()
+                            ), 'debug');
+                        } else {
+                            $this->log(sprintf(
+                                'prepare_cart_from_order: No _org_uuid found on order item %d (product_id: %d, order_id: %d) — cart item will not have org_uuid.',
+                                $item_id,
+                                $product_id,
+                                $order->get_id()
+                            ), 'debug');
+                        }
+                        $membership_post_id_renew = $item->get_meta('_membership_post_id_renew', true);
+                        if ($membership_post_id_renew) {
+                            $cart[$cart_item_key]['membership_post_id_renew'] = $membership_post_id_renew;
+                            $this->log(sprintf(
+                                'prepare_cart_from_order: Injected membership_post_id_renew [%s] into cart item key %s (product_id: %d, order_id: %d).',
+                                $membership_post_id_renew,
+                                $cart_item_key,
+                                $product_id,
+                                $order->get_id()
+                            ), 'debug');
+                        }
+
                         WC()->cart->set_cart_contents($cart);
                     }
 
@@ -418,7 +456,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         'line_subtotal_tax' => 0,
                         'taxes' => [], // Add empty taxes array
                         'custom_price' => $order_item_total / ($quantity > 0 ? $quantity : 1), // Store unit price for before_calculate_totals
+                        // Inject membership meta as top-level keys so Membership_Controller
+                        // can find them via $values['org_uuid'] / $values['membership_post_id_renew'].
+                        'org_uuid'                 => $item->get_meta('_org_uuid', true) ?: null,
+                        'membership_post_id_renew' => $item->get_meta('_membership_post_id_renew', true) ?: null,
                     ];
+
+                    $this->log(sprintf(
+                        'prepare_cart_from_order (fallback path): Injecting org_uuid [%s], membership_post_id_renew [%s] for product_id %d (order_item_id: %d, order_id: %d).',
+                        $item->get_meta('_org_uuid', true) ?: 'empty',
+                        $item->get_meta('_membership_post_id_renew', true) ?: 'empty',
+                        $product_id,
+                        $item_id,
+                        $order->get_id()
+                    ), 'debug');
 
                     // For subscription products, add WCS-specific cart item data
                     if (class_exists('WC_Subscription') && $product && $product->is_type('subscription')) {
@@ -922,6 +973,81 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
             return false;
         }
+    }
+
+    /**
+     * Normalize draft-style order statuses before guest payment/admin pay flows.
+     *
+     * @param WC_Order $order The order to validate/normalize.
+     * @param string   $flow  Flow label for logs/notes.
+     * @return true|WP_Error True when order is ready, WP_Error when not payable.
+     */
+    public function ensure_order_ready_for_guest_payment(WC_Order $order, string $flow = 'guest_payment')
+    {
+        $status = $order->get_status();
+        $order_id = $order->get_id();
+        $flow_label = str_replace('_', ' ', sanitize_key($flow));
+        if ('' === $flow_label) {
+            $flow_label = 'guest payment';
+        }
+
+        if (in_array($status, ['processing', 'completed', 'refunded', 'cancelled'], true)) {
+            $this->log(
+                sprintf(
+                    'Order ID %d is not payable for %s flow. Status: %s.',
+                    $order_id,
+                    $flow_label,
+                    $status
+                ),
+                'warning'
+            );
+
+            return new WP_Error(
+                'wgp_order_not_payable',
+                __('This order cannot be used for guest payment in its current status.', 'wicket-wgc')
+            );
+        }
+
+        if (!$order->needs_payment() || (float) $order->get_total() <= 0) {
+            $this->log(
+                sprintf(
+                    'Order ID %d is not payable for %s flow. needs_payment=%s total=%s.',
+                    $order_id,
+                    $flow_label,
+                    $order->needs_payment() ? 'yes' : 'no',
+                    (string) $order->get_total()
+                ),
+                'warning'
+            );
+
+            return new WP_Error(
+                'wgp_order_not_payable',
+                __('This order is not payable, so a guest payment link cannot be generated.', 'wicket-wgc')
+            );
+        }
+
+        if (in_array($status, ['draft', 'checkout-draft'], true)) {
+            $order->set_status('pending');
+            $order->add_order_note(
+                sprintf(
+                    __('Order status automatically changed from %1$s to pending before %2$s flow.', 'wicket-wgc'),
+                    $status,
+                    $flow_label
+                )
+            );
+            $order->save();
+
+            $this->log(
+                sprintf(
+                    'Order ID %d status changed from %s to pending before %s flow.',
+                    $order_id,
+                    $status,
+                    $flow_label
+                )
+            );
+        }
+
+        return true;
     }
 
     /**

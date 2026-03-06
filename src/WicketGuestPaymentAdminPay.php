@@ -15,6 +15,17 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     private const ADMIN_PAY_COOKIE_TOKEN = 'wgp_admin_pay';
     private const ADMIN_PAY_COOKIE_SECRET = 'wgp_admin_pay_secret';
     private const ADMIN_PAY_TTL = 900;
+    private WicketGuestPaymentCore $core;
+
+    /**
+     * Constructor.
+     *
+     * @param WicketGuestPaymentCore|null $core Optional injected core service for testing.
+     */
+    public function __construct(?WicketGuestPaymentCore $core = null)
+    {
+        $this->core = $core ?? new WicketGuestPaymentCore();
+    }
 
     /**
      * Initialize hooks.
@@ -65,6 +76,11 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         }
 
         $this->maybe_add_shipping_to_order($order);
+
+        $prepared = $this->core->ensure_order_ready_for_guest_payment($order, 'admin_pay');
+        if (is_wp_error($prepared)) {
+            wp_die(esc_html($prepared->get_error_message()));
+        }
 
         $customer_id = (int) $order->get_customer_id();
         if (!$customer_id) {

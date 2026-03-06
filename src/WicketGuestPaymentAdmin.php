@@ -575,6 +575,11 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             wp_send_json_error(['message' => __('Order not found. Please create and save the order before generating a guest payment link.', 'wicket-wgc')]);
         }
 
+        $prepared = $this->core->ensure_order_ready_for_guest_payment($order, 'manual_link');
+        if (is_wp_error($prepared)) {
+            wp_send_json_error(['message' => $prepared->get_error_message()]);
+        }
+
         // Check if order has a user assigned
         $user_id = (int) $order->get_meta('_wgp_guest_payment_user_id', true) ?: $order->get_customer_id();
         if (!$user_id) {
@@ -719,6 +724,13 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             wp_send_json_error(['message' => esc_html__('Order not found. Please save the order before generating and sending a guest payment link.', 'wicket-wgc')]);
 
             return; // Exit early
+        }
+
+        $prepared = $this->core->ensure_order_ready_for_guest_payment($order, 'email_link');
+        if (is_wp_error($prepared)) {
+            wp_send_json_error(['message' => esc_html($prepared->get_error_message())]);
+
+            return;
         }
 
         // Get user ID associated with the order

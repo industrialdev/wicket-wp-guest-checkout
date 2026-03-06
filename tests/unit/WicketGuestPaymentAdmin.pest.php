@@ -123,6 +123,10 @@ it('rejects manual link generation with invalid nonce', function (): void {
 
 it('generates a manual link for valid requests', function (): void {
     $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $core->shouldReceive('ensure_order_ready_for_guest_payment')
+        ->once()
+        ->with(Mockery::type('object'), 'manual_link')
+        ->andReturn(true);
     $core->shouldReceive('generate_token_for_order')
         ->once()
         ->with(123, '', 'manual')
@@ -131,7 +135,7 @@ it('generates a manual link for valid requests', function (): void {
     $email = Mockery::mock(WicketGuestPaymentEmail::class);
     $admin = new WicketGuestPaymentAdmin($core, $email);
 
-    $order = new class {
+    $order = new class extends WC_Order {
         public function get_meta(string $key, bool $single = false)
         {
             return '';
@@ -154,6 +158,51 @@ it('generates a manual link for valid requests', function (): void {
         'message' => 'New payment link has been generated successfully.',
         'link' => 'https://example.com/cart?guest_payment_token=token123',
     ]);
+
+    expect(function () use ($admin): void {
+        wgp_with_post([
+            'order_id' => 123,
+            'nonce' => 'good-nonce',
+        ], function () use ($admin): void {
+            $admin->handle_generate_guest_link_only_ajax();
+        });
+    })->toThrow(RuntimeException::class);
+});
+
+it('rejects manual link generation when order is not payable', function (): void {
+    $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $error = new class {
+        public function get_error_message(): string
+        {
+            return 'Order is not payable.';
+        }
+    };
+    $core->shouldReceive('ensure_order_ready_for_guest_payment')
+        ->once()
+        ->with(Mockery::type('object'), 'manual_link')
+        ->andReturn($error);
+
+    $email = Mockery::mock(WicketGuestPaymentEmail::class);
+    $admin = new WicketGuestPaymentAdmin($core, $email);
+
+    $order = new class extends WC_Order {
+        public function get_meta(string $key, bool $single = false)
+        {
+            return '';
+        }
+
+        public function get_customer_id(): int
+        {
+            return 55;
+        }
+    };
+
+    Monkey\Functions\when('wp_verify_nonce')->justReturn(true);
+    Monkey\Functions\when('current_user_can')->justReturn(true);
+    Monkey\Functions\when('wc_get_order')->justReturn($order);
+    Monkey\Functions\when('is_wp_error')->alias(static fn ($value) => $value === $error);
+
+    wgp_expect_json_error(['message' => 'Order is not payable.']);
 
     expect(function () use ($admin): void {
         wgp_with_post([
@@ -232,6 +281,10 @@ it('invalidates a guest link via ajax', function (): void {
 
 it('generates and sends a link via ajax', function (): void {
     $core = Mockery::mock(WicketGuestPaymentCore::class);
+    $core->shouldReceive('ensure_order_ready_for_guest_payment')
+        ->once()
+        ->with(Mockery::type('object'), 'email_link')
+        ->andReturn(true);
     $core->shouldReceive('generate_token_for_order')
         ->once()
         ->with(123, 'guest@example.com', 'email')
@@ -245,7 +298,7 @@ it('generates and sends a link via ajax', function (): void {
 
     $admin = new WicketGuestPaymentAdmin($core, $email);
 
-    $order = new class {
+    $order = new class extends WC_Order {
         public function get_user_id(): int
         {
             return 77;
