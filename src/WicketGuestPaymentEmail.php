@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use WC_Order_Item_Product;
+
 /**
  * Guest Subscription Payment Flow for WooCommerce - Email Notifications.
  *

@@ -6,6 +6,10 @@ namespace Composer\Autoload;
 
 class ComposerStaticInitc074b69ba9372173ed09599cbc23063b
 {
+    public static $files = array (
+        'e2d5f210d03a197d939d413ee6bc77e1' => __DIR__ . '/../..' . '/src/legacy-class-aliases.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
         'W' =>
         array (
@@ -21,19 +25,19 @@ class ComposerStaticInitc074b69ba9372173ed09599cbc23063b
     );
 
     public static $classMap = array (
-        'AbstractWicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/AbstractWicketGuestPaymentComponent.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
-        'TraitWicketGuestPaymentLogger' => __DIR__ . '/../..' . '/src/TraitWicketGuestPaymentLogger.php',
-        'WicketGuestPayment' => __DIR__ . '/../..' . '/src/WicketGuestPayment.php',
-        'WicketGuestPaymentAdmin' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdmin.php',
-        'WicketGuestPaymentAdminPay' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdminPay.php',
-        'WicketGuestPaymentAuth' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAuth.php',
-        'WicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/WicketGuestPaymentComponent.php',
-        'WicketGuestPaymentConfig' => __DIR__ . '/../..' . '/src/WicketGuestPaymentConfig.php',
-        'WicketGuestPaymentCore' => __DIR__ . '/../..' . '/src/WicketGuestPaymentCore.php',
-        'WicketGuestPaymentEmail' => __DIR__ . '/../..' . '/src/WicketGuestPaymentEmail.php',
-        'WicketGuestPaymentInvoice' => __DIR__ . '/../..' . '/src/WicketGuestPaymentInvoice.php',
-        'WicketGuestPaymentReceipt' => __DIR__ . '/../..' . '/src/WicketGuestPaymentReceipt.php',
+        'Wicket\\GuestPayment\\AbstractWicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/AbstractWicketGuestPaymentComponent.php',
+        'Wicket\\GuestPayment\\TraitWicketGuestPaymentLogger' => __DIR__ . '/../..' . '/src/TraitWicketGuestPaymentLogger.php',
+        'Wicket\\GuestPayment\\WicketGuestPayment' => __DIR__ . '/../..' . '/src/WicketGuestPayment.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentAdmin' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdmin.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentAdminPay' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAdminPay.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentAuth' => __DIR__ . '/../..' . '/src/WicketGuestPaymentAuth.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentComponent' => __DIR__ . '/../..' . '/src/WicketGuestPaymentComponent.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentConfig' => __DIR__ . '/../..' . '/src/WicketGuestPaymentConfig.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentCore' => __DIR__ . '/../..' . '/src/WicketGuestPaymentCore.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentEmail' => __DIR__ . '/../..' . '/src/WicketGuestPaymentEmail.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentInvoice' => __DIR__ . '/../..' . '/src/WicketGuestPaymentInvoice.php',
+        'Wicket\\GuestPayment\\WicketGuestPaymentReceipt' => __DIR__ . '/../..' . '/src/WicketGuestPaymentReceipt.php',
     );
 
     public static function getInitializer(ClassLoader $loader)

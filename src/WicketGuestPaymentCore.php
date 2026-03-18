@@ -2,6 +2,16 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use Exception;
+use WC_Cart;
+use WC_Order;
+use WC_Order_Item_Product;
+use WC_Product;
+use WC_Subscription;
+use WP_Error;
+
 /**
  * Guest Subscription Payment Flow for WooCommerce - Core Functionality.
  *

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
 /**
  * Logger Trait for Guest Payment System.
  *

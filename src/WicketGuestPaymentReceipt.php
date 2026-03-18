@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use Exception;
+use WC_Order;
+
 /**
  * Guest Subscription Payment Flow for WooCommerce - Receipt Management.
  *
