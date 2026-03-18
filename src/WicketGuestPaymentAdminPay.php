@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use Exception;
+use WC_Order;
+use WC_Order_Item_Shipping;
+use WC_Shipping_Zones;
+
 /**
  * Admin pay flow for order payments with impersonation and auto-return.
  */

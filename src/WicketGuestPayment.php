@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use WC_Product;
+use WC_Product_Variation;
+
 /**
  * Guest Subscription Payment Flow for WooCommerce - Main Class.
  *

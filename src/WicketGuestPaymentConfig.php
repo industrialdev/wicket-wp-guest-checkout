@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Wicket\GuestPayment;
+
+use WP_Error;
+
 /**
  * Guest Subscription Payment Flow for WooCommerce - Configuration Class.
  *
