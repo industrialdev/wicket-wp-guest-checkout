@@ -12,7 +12,7 @@ use WC_Product;
 use WC_Subscription;
 use WP_Error;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Core Functionality.
  *
  * Handles core token generation, validation, storage, and payment initiation.

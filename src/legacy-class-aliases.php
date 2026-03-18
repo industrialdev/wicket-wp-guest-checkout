@@ -17,11 +17,11 @@ $wicketGuestPaymentClassAliases = [
 ];
 
 foreach ($wicketGuestPaymentClassAliases as $target => $alias) {
-    if (! class_exists($target)) {
+    if (!class_exists($target)) {
         continue;
     }
 
-    if (! class_exists($alias, false)) {
+    if (!class_exists($alias, false)) {
         class_alias($target, $alias);
     }
 }

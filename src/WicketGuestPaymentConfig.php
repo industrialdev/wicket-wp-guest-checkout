@@ -6,7 +6,7 @@ namespace Wicket\GuestPayment;
 
 use WP_Error;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Configuration Class.
  *
  * Handles all configuration options, filters, and constants for the plugin.

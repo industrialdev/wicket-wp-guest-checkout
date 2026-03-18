@@ -7,7 +7,7 @@ namespace Wicket\GuestPayment;
 use Exception;
 use WC_Order;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Receipt Management.
  *
  * Handles receipt access and delivery for guest payers after payment completion.

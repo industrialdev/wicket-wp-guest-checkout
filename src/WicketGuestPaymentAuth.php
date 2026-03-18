@@ -9,7 +9,7 @@ use WC_Checkout;
 use WC_Order;
 use WP_Error;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Auth and Restrictions.
  *
  * Handles user authentication and page access restrictions for guest payments.

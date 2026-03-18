@@ -7,7 +7,7 @@ namespace Wicket\GuestPayment;
 use WC_Product;
 use WC_Product_Variation;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Main Class.
  *
  * Coordinates and initializes the entire guest payment system.
@@ -33,7 +33,11 @@ defined('ABSPATH') || exit;
 // If you want to define them yourself to be different for security reasons, add them to wp-config.php
 if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
     // Use wp-config.php SECURE_AUTH_KEY + AUTH_KEY for encryption
-    define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', SECURE_AUTH_KEY . AUTH_KEY);
+    if (defined('SECURE_AUTH_KEY') && defined('AUTH_KEY')) {
+        define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', \SECURE_AUTH_KEY . \AUTH_KEY);
+    } else {
+        define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'fallback-key-please-define-in-wp-config');
+    }
 }
 if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
     define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');

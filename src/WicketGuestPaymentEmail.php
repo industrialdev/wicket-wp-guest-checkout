@@ -6,7 +6,7 @@ namespace Wicket\GuestPayment;
 
 use WC_Order_Item_Product;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Email Notifications.
  *
  * Handles sending email notifications for guest payments.

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Wicket\GuestPayment;
 
-use Automattic\WooCommerce\Utilities\OrderUtil;
 use WC_Order;
 use WP_Post;
 
-/**
+/*
  * Guest Subscription Payment Flow for WooCommerce - Admin Interface.
  *
  * Handles the admin interface for creating and managing guest payment tokens.

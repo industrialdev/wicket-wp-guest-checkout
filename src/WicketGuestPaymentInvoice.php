@@ -7,7 +7,7 @@ namespace Wicket\GuestPayment;
 use WC_Email;
 use WC_Order;
 
-/**
+/*
  * Guest Payment Invoice/Email Integration & Helper.
  */
 

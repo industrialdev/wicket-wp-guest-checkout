@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Wicket\GuestPayment;
 
-/**
+/*
  * Abstract Base Class for Guest Payment Components.
  *
  * Provides common functionality for all guest payment component classes.
