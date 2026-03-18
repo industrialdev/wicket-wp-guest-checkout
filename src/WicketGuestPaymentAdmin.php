@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Wicket\GuestPayment;
 
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use WC_Order;
 use WP_Post;
 
@@ -139,8 +140,8 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
      */
     private function is_custom_order_tables_usage_enabled(): bool
     {
-        if (class_exists('\Automattic\WooCommerce\Utilities\OrderUtil')) {
-            return Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+        if (class_exists(OrderUtil::class)) {
+            return OrderUtil::custom_orders_table_usage_is_enabled();
         }
 
         return false;
