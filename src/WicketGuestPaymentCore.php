@@ -697,7 +697,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
         $token_hash = hash_hmac('sha256', $token, defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') ? WICKET_GUEST_PAYMENT_ENCRYPTION_KEY : '');
 
-        $this->log(sprintf('Token encryption and HMAC hash generation successful for Order ID: %d (Hash: %s)', $order_id, $token_hash));
+        $this->log(sprintf('Token encryption and HMAC hash generation successful for Order ID: %d', $order_id));
 
         // Store metadata
         $timestamp = time();

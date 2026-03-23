@@ -52,9 +52,8 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         add_action('woocommerce_order_status_processing', [$this, 'generate_receipt_access_token']);
         add_action('woocommerce_order_status_completed', [$this, 'generate_receipt_access_token']);
 
-        // Add AJAX handler for email receipt delivery (via management interface)
+        // Add AJAX handler for email receipt delivery (via management interface - authenticated only)
         add_action('wp_ajax_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
-        add_action('wp_ajax_nopriv_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
 
         // Add AJAX handler for email capture on Thank You page
         add_action('wp_ajax_wicket_set_guest_email_and_send_receipt', [$this, 'ajax_set_guest_email_and_send_receipt']);
@@ -459,11 +458,8 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
     public function ajax_set_guest_email_and_send_receipt(): void
     {
         $order_id = absint($_POST['order_id'] ?? 0);
-        //$this->log(sprintf('AJAX Receipt Request - Order ID: %d, POST Data: %s', $order_id, print_r($_POST, true)));
 
-        $action = 'wicket_process_guest_email_' . $order_id;
-
-        // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition
+        // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition.
         // This token depends only on the Order ID and the site's Nonce Salt, making it stable across the logout boundary.
         $expected_hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
         $received_nonce = $_POST['nonce'] ?? '';
@@ -473,6 +469,14 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             $this->log(sprintf('Security token verification failed. Order ID: %d', $order_id));
             wp_send_json_error(['message' => __('Security check failed. Please reload the page.', 'wicket-wgc')], 403);
         }
+
+        // Rate limit: max 3 receipt email sends per order per hour (prevents enumeration / email relay abuse).
+        $rate_key     = 'wgp_receipt_send_' . $order_id;
+        $send_attempts = (int) get_transient($rate_key);
+        if ($send_attempts >= 3) {
+            wp_send_json_error(['message' => __('Too many attempts. Please try again later.', 'wicket-wgc')], 429);
+        }
+        set_transient($rate_key, $send_attempts + 1, HOUR_IN_SECONDS);
 
         $email = sanitize_email($_POST['email'] ?? '');
         if (!is_email($email)) {
@@ -488,8 +492,6 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         $order->update_meta_data('_wgp_guest_payment_email', $email);
         $order->save();
 
-        //$this->log(sprintf('Associated email %s with guest order %d via Thank You page.', $email, $order_id));
-
         // Generate receipt token
         $this->generate_receipt_access_token($order_id);
 
@@ -497,7 +499,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         $sent = $this->send_receipt_email($order, $email);
 
         if ($sent) {
-            wp_send_json_success(['message' => __('Receipt sent successfully to ' . $email, 'wicket-wgc')]);
+            wp_send_json_success(['message' => __('Receipt sent successfully.', 'wicket-wgc')]);
         } else {
             wp_send_json_error(['message' => __('Failed to send receipt email. Please contact support.', 'wicket-wgc')]);
         }

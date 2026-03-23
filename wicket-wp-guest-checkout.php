@@ -37,8 +37,16 @@ if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
     if (defined('SECURE_AUTH_KEY') && defined('AUTH_KEY')) {
         define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', SECURE_AUTH_KEY . AUTH_KEY);
     } else {
-        // Fallback - but this should be defined in wp-config.php
-        define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'fallback-key-please-define-in-wp-config');
+        // Derive a stable, site-unique key from values that are always present in WordPress.
+        // wp_salt() is preferred but is unavailable this early in the boot sequence, so we
+        // combine the site URL and admin email — both site-specific and not publicly guessable
+        // in combination — and hash them to produce a 64-character hex key.
+        // This is weaker than proper wp-config.php salts; defining SECURE_AUTH_KEY + AUTH_KEY
+        // there remains the recommended approach.
+        define(
+            'WICKET_GUEST_PAYMENT_ENCRYPTION_KEY',
+            hash('sha256', get_site_url() . get_option('admin_email') . 'wicket-wgc-enc')
+        );
     }
 }
 if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {

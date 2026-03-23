@@ -62,12 +62,12 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             wp_die(esc_html__('Invalid order ID.', 'wicket-wgc'));
         }
 
+        check_admin_referer('wicket_admin_pay_' . $order_id);
+
         $admin_id = get_current_user_id();
         if (!$this->is_admin_user($admin_id)) {
             wp_die(esc_html__('You do not have permission to perform this action.', 'wicket-wgc'));
         }
-
-        check_admin_referer('wicket_admin_pay_' . $order_id);
 
         $order = wc_get_order($order_id);
         if (!$order) {

@@ -596,9 +596,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             // Rate Limiting Logic
             $ip_address = $this->get_user_ip_address();
 
-            // Only apply rate limiting if the IP is not a local development IP (172.18.*.*)
-            if (!str_starts_with($ip_address, '172.18.')) {
-                $transient_key = 'guest_pay_limit_' . str_replace(['.', ':'], '_', $ip_address);  // Sanitize IP for transient key
+            // Rate limiting is always active in production.
+            // To disable it in a local/CI environment, define WGP_DISABLE_RATE_LIMIT=true in wp-config.php.
+            if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT)) {
+                $transient_key   = 'guest_pay_limit_' . str_replace(['.', ':'], '_', $ip_address);
                 $failed_attempts = (int) get_transient($transient_key);
 
                 // If limit exceeded, redirect and exit
@@ -608,10 +609,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     $this->maybe_exit();
                 }
             } else {
-                // Log that rate limiting is skipped for local IP range
-                //$this->log('Skipping rate limit check for local IP range (172.18.*.*): ' . $ip_address);
-                $transient_key = null; // Ensure transient key is null if skipped
-                $failed_attempts = 0;  // Ensure failed attempts is 0 if skipped
+                $transient_key   = null;
+                $failed_attempts = 0;
             }
 
             // Validate the token and retrieve the associated WC_Order object
@@ -628,8 +627,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 if (is_null($token_data)) {
                     $this->log('Token validation failed: Token data for order #' . $order->get_id() . ' is invalid or expired.');
 
-                    // Increment transient only if rate limiting is active for this IP
-                    if (!str_starts_with($ip_address, '172.18.') && $transient_key) {
+                    // Increment transient only if rate limiting is active
+                    if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
                         set_transient($transient_key, $failed_attempts + 1, self::FAILED_ATTEMPT_WINDOW_SECONDS);
                     }
                     wp_safe_redirect(home_url('/?guest_payment_error=expired'));
@@ -664,8 +663,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     //    sprintf('User ID: %d authenticated successfully via token. Original Order ID: %d stored. Guest session flag cookie set.', $user_id, $order->get_id())
                     //);
 
-                    // Clear the rate limit transient on success only if rate limiting was active
-                    if (!str_starts_with($ip_address, '172.18.') && $transient_key) {
+                    // Clear the rate limit transient on success only if rate limiting is active
+                    if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
                         delete_transient($transient_key);
                     }
 
@@ -867,9 +866,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     $this->maybe_exit();
                 }
             } elseif (is_wp_error($order) || $order === false) {
-                // Increment failed attempts count
-                // Increment transient only if rate limiting is active for this IP
-                if (!str_starts_with($ip_address, '172.18.') && $transient_key) {
+                // Increment failed attempts count only if rate limiting is active
+                if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
                     set_transient($transient_key, $failed_attempts + 1, self::FAILED_ATTEMPT_WINDOW_SECONDS);
                 }
 
