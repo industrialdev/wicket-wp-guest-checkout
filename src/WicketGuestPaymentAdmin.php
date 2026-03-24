@@ -315,22 +315,23 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
             <div class="wicket-ajax-feedback wicket-ajax-feedback-bottom notice" style="display: none; margin: 5px 0 0 0; padding: 5px;"></div>
         </div>
 
-        <hr style="margin: 20px 0;">
-        <h4><?php esc_html_e('Pay For Customer', 'wicket-wgc'); ?></h4>
-        <p><?php esc_html_e('Open a secure checkout session for this order. You will be returned to this order after payment completes.', 'wicket-wgc'); ?></p>
-        <?php
-        if (!$this->current_user_is_admin()) {
-            echo '<p><em>' . esc_html__('Admin access required.', 'wicket-wgc') . '</em></p>';
-        } else {
-            $pay_user_id = (int) $order->get_customer_id();
-            if (!$pay_user_id) {
-                echo '<p><em>' . esc_html__('This order must be assigned to a customer before paying on their behalf.', 'wicket-wgc') . '</em></p>';
+        <?php if ($this->is_admin_pay_enabled()) { ?>
+            <hr style="margin: 20px 0;">
+            <h4><?php esc_html_e('Pay For Customer', 'wicket-wgc'); ?></h4>
+            <p><?php esc_html_e('Open a secure checkout session for this order. You will be returned to this order after payment completes.', 'wicket-wgc'); ?></p>
+            <?php
+            if (!$this->current_user_is_admin()) {
+                echo '<p><em>' . esc_html__('Admin access required.', 'wicket-wgc') . '</em></p>';
             } else {
-                $admin_pay_url = wp_nonce_url(
-                    admin_url('admin-post.php?action=wicket_admin_pay&order_id=' . $order_id),
-                    'wicket_admin_pay_' . $order_id
-                );
-                ?>
+                $pay_user_id = (int) $order->get_customer_id();
+                if (!$pay_user_id) {
+                    echo '<p><em>' . esc_html__('This order must be assigned to a customer before paying on their behalf.', 'wicket-wgc') . '</em></p>';
+                } else {
+                    $admin_pay_url = wp_nonce_url(
+                        admin_url('admin-post.php?action=wicket_admin_pay&order_id=' . $order_id),
+                        'wicket_admin_pay_' . $order_id
+                    );
+                    ?>
             <a class="button button-primary" href="<?php echo esc_url($admin_pay_url); ?>" target="_blank" rel="noopener noreferrer">
                 <?php esc_html_e('Pay for Customer Now', 'wicket-wgc'); ?>
             </a>
@@ -406,9 +407,10 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
                 })();
             </script>
         <?php
+                }
             }
-        }
-        ?>
+            ?>
+        <?php } ?>
 
 <?php
         // END: Add 'Generate Link Manually' Button
@@ -417,6 +419,16 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
     private function current_user_is_admin(): bool
     {
         return current_user_can('manage_woocommerce') || current_user_can('manage_options');
+    }
+
+    /**
+     * Determine whether Admin Pay flow is enabled in settings.
+     *
+     * @return bool
+     */
+    private function is_admin_pay_enabled(): bool
+    {
+        return (bool) apply_filters('wicket/wooguestpay/admin_pay_enabled', true);
     }
 
     /**

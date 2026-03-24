@@ -62,6 +62,10 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             wp_die(esc_html__('Invalid order ID.', 'wicket-wgc'));
         }
 
+        if (!$this->is_admin_pay_enabled()) {
+            wp_die(esc_html__('Pay for Customer is disabled by settings.', 'wicket-wgc'));
+        }
+
         check_admin_referer('wicket_admin_pay_' . $order_id);
 
         $admin_id = get_current_user_id();
@@ -124,6 +128,16 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $pay_url = add_query_arg('wgp_admin_pay', $token, $order->get_checkout_payment_url());
         wp_safe_redirect($pay_url);
         $this->maybe_exit();
+    }
+
+    /**
+     * Determine whether Admin Pay flow is enabled in settings.
+     *
+     * @return bool
+     */
+    private function is_admin_pay_enabled(): bool
+    {
+        return (bool) apply_filters('wicket/wooguestpay/admin_pay_enabled', true);
     }
 
     /**

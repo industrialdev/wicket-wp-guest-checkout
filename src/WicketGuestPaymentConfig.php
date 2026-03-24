@@ -35,7 +35,9 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     private const OPTION_PDF_ENABLED = 'wicket_guest_payment_enable_pdf_integration';
     private const OPTION_EMAIL_SUBJECT_TEMPLATE = 'wicket_guest_payment_email_subject_template'; // legacy fallback
     private const OPTION_EMAIL_BODY_TEMPLATE = 'wicket_guest_payment_email_body_template'; // legacy fallback
+    private const OPTION_ADMIN_PAY_ENABLED = 'wicket_guest_payment_enable_admin_pay'; // legacy fallback
     private const OPTION_WICKET_TOKEN_EXPIRY_DAYS = 'wicket_admin_settings_guest_payment_token_expiry_days';
+    private const OPTION_WICKET_ADMIN_PAY_ENABLED = 'wicket_admin_settings_guest_payment_enable_admin_pay';
     private const OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE = 'wicket_admin_settings_guest_payment_email_subject_template';
     private const OPTION_WICKET_EMAIL_BODY_TEMPLATE = 'wicket_admin_settings_guest_payment_email_body_template';
 
@@ -67,6 +69,9 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
 
         // Token expiry configuration
         add_filter('wicket/wooguestpay/token_expiry_days', [$this, 'filter_token_expiry_days'], 10, 1);
+
+        // Admin pay flow configuration
+        add_filter('wicket/wooguestpay/admin_pay_enabled', [$this, 'filter_admin_pay_enabled'], 10, 1);
     }
 
     /**
@@ -233,6 +238,24 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     }
 
     /**
+     * Filter for admin pay feature enabled status.
+     *
+     * @param bool $default_enabled Default enabled status.
+     * @return bool Filtered enabled status.
+     */
+    public function filter_admin_pay_enabled(bool $default_enabled): bool
+    {
+        // Prefer Wicket Settings option
+        $wicket_value = $this->get_wicket_option(self::OPTION_WICKET_ADMIN_PAY_ENABLED, null);
+        if (null !== $wicket_value) {
+            return $this->coerce_to_bool($wicket_value);
+        }
+
+        // Backward compatibility with legacy standalone option
+        return $this->get_option_bool(self::OPTION_ADMIN_PAY_ENABLED, $default_enabled);
+    }
+
+    /**
      * Read a value from the Wicket Settings datastore.
      *
      * @param string $key Option key inside wicket_settings.
@@ -284,6 +307,21 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         $value = get_option($option_name, $default);
 
         // Convert various values to boolean
+        if (is_string($value)) {
+            return in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
+        }
+
+        return (bool) $value;
+    }
+
+    /**
+     * Convert mixed values to strict boolean.
+     *
+     * @param mixed $value Raw option value.
+     * @return bool
+     */
+    private function coerce_to_bool($value): bool
+    {
         if (is_string($value)) {
             return in_array(strtolower($value), ['true', '1', 'yes', 'on'], true);
         }
@@ -358,6 +396,13 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 'min' => '1',
                 'step' => '1',
             ],
+        ]);
+
+        $section->add_option('checkbox', [
+            'name' => self::OPTION_WICKET_ADMIN_PAY_ENABLED,
+            'label' => __('Enable "Pay for Customer Now"', 'wicket-wgc'),
+            'description' => __('Allow staff to open the admin-assisted checkout flow that lets them enter payment details on behalf of customers.', 'wicket-wgc'),
+            'default' => true,
         ]);
 
         $section->add_option('text', [
@@ -453,6 +498,13 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 ],
             ],
             [
+                'title' => __('Enable "Pay for Customer Now"', 'wicket-wgc'),
+                'desc' => __('Allow staff to open the admin-assisted checkout flow that lets them enter payment details on behalf of customers.', 'wicket-wgc'),
+                'id' => self::OPTION_ADMIN_PAY_ENABLED,
+                'type' => 'checkbox',
+                'default' => 'yes',
+            ],
+            [
                 'title' => __('Email Subject Template', 'wicket-wgc'),
                 'desc' => __('Available placeholders: <code>{site_name}</code>, <code>{member_name}</code>, <code>{order_number}</code>, <code>{order_total}</code>, <code>{expiry_date}</code>.', 'wicket-wgc'),
                 'id' => self::OPTION_EMAIL_SUBJECT_TEMPLATE,
@@ -508,6 +560,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         return [
             'email_integration_enabled' => $this->filter_email_integration_enabled(false),
             'pdf_integration_enabled' => $this->filter_pdf_integration_enabled(false),
+            'admin_pay_enabled' => $this->filter_admin_pay_enabled(true),
             'token_expiry_days' => $this->filter_token_expiry_days(7),
             'email_subject_template' => (string) get_option(
                 self::OPTION_EMAIL_SUBJECT_TEMPLATE,
@@ -564,6 +617,32 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     public function disable_pdf_integration(): bool
     {
         return update_option(self::OPTION_PDF_ENABLED, false);
+    }
+
+    /**
+     * Enable admin pay flow via WordPress option.
+     *
+     * @return bool True if option was updated successfully.
+     */
+    public function enable_admin_pay(): bool
+    {
+        $saved_wicket = $this->set_wicket_option(self::OPTION_WICKET_ADMIN_PAY_ENABLED, true);
+        $saved_legacy = update_option(self::OPTION_ADMIN_PAY_ENABLED, true);
+
+        return $saved_wicket || $saved_legacy;
+    }
+
+    /**
+     * Disable admin pay flow via WordPress option.
+     *
+     * @return bool True if option was updated successfully.
+     */
+    public function disable_admin_pay(): bool
+    {
+        $saved_wicket = $this->set_wicket_option(self::OPTION_WICKET_ADMIN_PAY_ENABLED, false);
+        $saved_legacy = update_option(self::OPTION_ADMIN_PAY_ENABLED, false);
+
+        return $saved_wicket || $saved_legacy;
     }
 
     /**
@@ -640,6 +719,12 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 'value' => $this->filter_token_expiry_days(7),
                 'option' => self::OPTION_WICKET_TOKEN_EXPIRY_DAYS,
             ],
+            'admin_pay_enabled' => [
+                'label' => __('Pay for Customer Now', 'wicket-wgc'),
+                'description' => __('Allow staff to open the admin-assisted checkout flow and enter payment details on behalf of customers.', 'wicket-wgc'),
+                'enabled' => $this->filter_admin_pay_enabled(true),
+                'option' => self::OPTION_WICKET_ADMIN_PAY_ENABLED,
+            ],
             'email_subject_template' => [
                 'label' => __('Email Subject Template', 'wicket-wgc'),
                 'description' => __('Template for guest payment email subject line.', 'wicket-wgc'),
@@ -690,6 +775,11 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             } else {
                 $errors['token_expiry_days'] = __('Token expiry must be between 1 and 365 days', 'wicket-wgc');
             }
+        }
+
+        // Validate admin pay enabled toggle
+        if (isset($config['admin_pay_enabled'])) {
+            $validated['admin_pay_enabled'] = rest_sanitize_boolean($config['admin_pay_enabled']);
         }
 
         // Validate email subject template
@@ -756,6 +846,15 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         // Save token expiry setting
         if (isset($validated['token_expiry_days'])) {
             $this->set_token_expiry_days($validated['token_expiry_days']);
+        }
+
+        // Save admin pay enabled setting
+        if (isset($validated['admin_pay_enabled'])) {
+            if ($validated['admin_pay_enabled']) {
+                $this->enable_admin_pay();
+            } else {
+                $this->disable_admin_pay();
+            }
         }
 
         // Save email subject template
