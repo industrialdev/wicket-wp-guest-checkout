@@ -3,6 +3,13 @@ node_modules/
 npm-debug.log
 package-lock.json
 
+# Yarn PnP and cache artifacts
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/releases/
+.yarn/install-state.gz
+.yarn/unplugged/
+
 # PHP Tools
 .phpunit.result.cache
 .phpunit.cache
