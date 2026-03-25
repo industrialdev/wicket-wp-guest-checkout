@@ -87,6 +87,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         // Force WooCommerce to reuse the original order during checkout (prevent duplicates)
         add_filter('woocommerce_create_order', [$this, 'force_reuse_guest_payment_order'], 5, 2);
 
+        // Prevent WooCommerce Subscriptions from creating duplicate subscriptions during guest checkout.
+        // WCS hooks into woocommerce_checkout_order_processed at priority 100 and creates new subscriptions
+        // from the cart. When the order is a renewal (child of a subscription) WCS's own cleanup doesn't
+        // find the existing subscription, so it would create a second one. We remove the WCS callback
+        // early (priority 5) whenever the order already has a subscription relationship.
+        add_action('woocommerce_checkout_order_processed', [$this, 'maybe_prevent_duplicate_wcs_subscriptions'], 5, 2);
+        add_action('woocommerce_store_api_checkout_order_processed', [$this, 'maybe_prevent_duplicate_wcs_subscriptions'], 5, 1);
+
         // HARD STOPPER: Validate order ID before checkout processing (last line of defense)
         add_action('woocommerce_checkout_process', [$this, 'validate_guest_payment_order_before_checkout'], 1); // Classic Checkout
         add_action('woocommerce_checkout_validate_order_before_payment', [$this, 'validate_guest_payment_order_before_payment_block'], 1, 2); // Block Checkout
@@ -163,6 +171,53 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Return the original order ID to prevent duplicate creation
         return (int) $original_order_id;
+    }
+
+    /**
+     * Prevent WooCommerce Subscriptions from creating a new (duplicate) subscription during
+     * guest checkout when the order already has a subscription relationship.
+     *
+     * The full checkout flow triggers WCS's process_checkout (hooked at priority 100 on
+     * woocommerce_checkout_order_processed), which creates new subscriptions from the cart.
+     * For renewal orders, WCS's own cleanup only searches for subscriptions where the order
+     * is the *parent* — it won't find the existing subscription (the order is a child of it),
+     * so WCS creates a second subscription instead of reusing the existing one.
+     *
+     * The Admin Pay flow avoids this entirely because it uses the order-pay endpoint, which
+     * never fires woocommerce_checkout_order_processed.
+     *
+     * @hooked woocommerce_checkout_order_processed (priority 5)
+     * @hooked woocommerce_store_api_checkout_order_processed (priority 5)
+     *
+     * @param int   $order_id    The order being processed.
+     * @param array $posted_data Checkout form data (may be empty for blocks checkout).
+     * @return void
+     */
+    public function maybe_prevent_duplicate_wcs_subscriptions($order_id, $posted_data = []): void
+    {
+        // Only act during guest payment sessions.
+        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+            return;
+        }
+
+        // Only relevant when WooCommerce Subscriptions is active.
+        if (!function_exists('wcs_order_contains_subscription') || !class_exists('WC_Subscriptions_Checkout')) {
+            return;
+        }
+
+        // If the order already has any subscription relationship (parent, renewal, resubscribe, switch),
+        // WCS must not create new subscriptions from the cart — that would be a duplicate.
+        // NOTE: must pass 'any' — the default only checks ['parent','resubscribe','switch'] and
+        // misses renewal orders, which is exactly the case that causes the duplicate subscription.
+        if (wcs_order_contains_subscription($order_id, 'any')) {
+            $this->log(sprintf(
+                'SUBSCRIPTION GUARD: Order #%d already has a subscription relationship. ' .
+                'Removing WCS process_checkout to prevent duplicate subscription creation.',
+                $order_id
+            ));
+            remove_action('woocommerce_checkout_order_processed', ['WC_Subscriptions_Checkout', 'process_checkout'], 100);
+            remove_action('woocommerce_store_api_checkout_order_processed', ['WC_Subscriptions_Checkout', 'process_checkout'], 100);
+        }
     }
 
     /**
