@@ -54,5 +54,5 @@
     "cs:fix": "Run PHP CS Fixer to fix coding standards issues"
   },
   "type": "wordpress-plugin",
-  "version": "1.3.17"
+  "version": "1.3.18"
 }
