@@ -521,9 +521,9 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
     /**
      * Enqueue admin scripts for AJAX functionality.
      *
-     * @param string $hook_suffix The current admin page.
+     * @param string|null $hook_suffix The current admin page.
      */
-    public function enqueue_admin_scripts(string $hook_suffix): void
+    public function enqueue_admin_scripts(?string $hook_suffix): void
     {
         $screen = get_current_screen();
 
