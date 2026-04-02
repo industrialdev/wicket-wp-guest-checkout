@@ -1,8 +1,8 @@
 <?php return array(
     'root' => array(
         'name' => 'industrialdev/wicket-wp-guest-checkout',
-        'pretty_version' => '1.3.16',
-        'version' => '1.3.16.0',
+        'pretty_version' => '1.3.19',
+        'version' => '1.3.19.0',
         'reference' => null,
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
@@ -11,8 +11,8 @@
     ),
     'versions' => array(
         'industrialdev/wicket-wp-guest-checkout' => array(
-            'pretty_version' => '1.3.16',
-            'version' => '1.3.16.0',
+            'pretty_version' => '1.3.19',
+            'version' => '1.3.19.0',
             'reference' => null,
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
