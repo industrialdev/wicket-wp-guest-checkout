@@ -39,13 +39,7 @@ Wicket Guest Checkout allows WordPress administrators to generate secure payment
 
 ## Documentation
 
-For complete documentation, including configuration examples, integration guides, and troubleshooting, see the **[Documentation Index](docs/index.md)**.
-
-### Quick Links
-- **[📚 Documentation Index](docs/index.md)** - Complete documentation with guides and references
-- **[⚙️ Configuration Quick Reference](docs/configuration-quick-reference.md)** - All configuration options
-- **[📧 Email Integration](docs/email-integration.md)** - Configure automatic email links
-- **[📄 PDF Integration](docs/pdf-integration.md)** - Configure automatic PDF links
+For complete documentation, see **[docs/index.md](docs/index.md)**.
 
 ## Requirements
 
