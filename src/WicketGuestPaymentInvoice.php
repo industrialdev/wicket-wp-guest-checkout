@@ -187,7 +187,7 @@ class WicketGuestPaymentInvoice extends WicketGuestPaymentComponent
     public function append_guest_payment_link_to_pdf($document, $order)
     {
         // PDF plugin passes ($document, $order) or ($order, $document) depending on version, so normalize.
-        $hook = current_filter();
+        $hook = function_exists('current_filter') ? (string) current_filter() : '';
         $document_type = null;
         if (is_string($document)) {
             $document_type = $document;

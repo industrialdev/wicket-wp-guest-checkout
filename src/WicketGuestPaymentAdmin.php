@@ -46,7 +46,15 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
     {
         $this->core = $core;
         $this->email = $email;
+    }
 
+    /**
+     * Initialize hooks.
+     *
+     * @return void
+     */
+    public function init(): void
+    {
         // Hook the method to add the meta box
         add_action('add_meta_boxes', [$this, 'add_guest_payment_meta_box'], 10, 2);
 
@@ -61,15 +69,7 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
         add_action('wp_ajax_wicket_invalidate_link', [$this, 'handle_invalidate_link_ajax']);
         // Enqueue JS for AJAX
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
-    }
 
-    /**
-     * Initialize hooks.
-     *
-     * @return void
-     */
-    public function init(): void
-    {
         // Add order actions
         add_filter('woocommerce_order_actions', [$this, 'add_guest_payment_order_action']);
         add_action('woocommerce_order_action_wicket_create_guest_payment_link', [$this, 'process_guest_payment_order_action']);
