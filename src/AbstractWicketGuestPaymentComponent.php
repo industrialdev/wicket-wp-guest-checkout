@@ -77,7 +77,7 @@ abstract class AbstractWicketGuestPaymentComponent
      */
     protected function maybe_exit(): void
     {
-        if (defined('WGP_DOING_TESTING') && WGP_DOING_TESTING) {
+        if (defined('WICKET_DOING_TESTS') && WICKET_DOING_TESTS) {
             return;
         }
 
