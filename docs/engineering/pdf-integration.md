@@ -1,3 +1,10 @@
+---
+title: "PDF Integration"
+audience: [developer]
+php_class: WicketGuestPaymentInvoice
+source_files: ["src/WicketGuestPaymentInvoice.php", "src/WicketGuestPaymentConfig.php"]
+---
+
 # PDF Integration Configuration
 
 This document explains how guest payment links are appended to supported PDF invoice outputs.
@@ -102,4 +109,4 @@ var_dump(apply_filters('wicket/wooguestpay/pdf_integration_enabled', true, 'invo
 ## Related Docs
 
 - [Configuration Quick Reference](configuration-quick-reference.md)
-- [Email Integration Configuration](email-integration.md)
+- [Email Integration Configuration](../guides/email-integration.md)

@@ -1,3 +1,10 @@
+---
+title: "Configuration Quick Reference"
+audience: [developer]
+php_class: WicketGuestPaymentConfig
+source_files: ["src/WicketGuestPaymentConfig.php"]
+---
+
 # Configuration Quick Reference
 
 This document summarizes the currently supported configuration points in Wicket Guest Checkout.
@@ -59,6 +66,16 @@ add_filter('wicket/wooguestpay/pdf_integration_enabled', '__return_false');
 add_filter('wicket/wooguestpay/token_expiry_days', function ($days) {
     return 14;
 });
+```
+
+### Admin Pay Flow
+
+| Filter | Default | Description |
+|---|---:|---|
+| `wicket/wooguestpay/admin_pay_enabled` | `true` | Enables/disables the "Pay for Customer Now" admin flow. |
+
+```php
+add_filter('wicket/wooguestpay/admin_pay_enabled', '__return_false');
 ```
 
 ## Core Validation Filters
@@ -166,6 +183,6 @@ define('WICKET_GUEST_PAYMENT_DEBUG', true);
 
 ## Related Docs
 
-- [Email Integration Configuration](email-integration.md)
+- [Email Integration Configuration](../guides/email-integration.md)
 - [PDF Integration Configuration](pdf-integration.md)
-- [Email Template Customization](email-template-customization.md)
+- [Email Template Customization](../guides/email-template-customization.md)

@@ -1,3 +1,8 @@
+---
+title: "Email Integration"
+audience: [implementer, support]
+---
+
 # Email Integration Configuration
 
 This guide covers both email-related features in Wicket Guest Checkout.
@@ -158,6 +163,6 @@ var_dump(apply_filters('wicket/wooguestpay/email_integration_enabled', false));
 
 ## Related Docs
 
-- [Configuration Quick Reference](configuration-quick-reference.md)
+- [Configuration Quick Reference](../engineering/configuration-quick-reference.md)
 - [Email Template Customization](email-template-customization.md)
-- [PDF Integration Configuration](pdf-integration.md)
+- [PDF Integration Configuration](../engineering/pdf-integration.md)

@@ -2,9 +2,8 @@
 title: "Guest Checkout Settings"
 audience: [implementer, support]
 wp_admin_path: "Wicket → Settings → Integrations → Guest Checkout"
-php_class: Wicket\GuestPayment\WicketGuestPaymentConfig
-db_option_prefix: wicket_settings[wicket_admin_settings_guest_payment_]
-source_files: ["src/WicketGuestPaymentConfig.php"]
+php_class: WicketGuestPaymentConfig
+db_option_prefix: wicket_admin_settings_guest_payment_
 ---
 
 # Guest Checkout Settings

@@ -44,7 +44,7 @@ For complete documentation, see **[docs/index.md](docs/index.md)**.
 ## Requirements
 
 - **WordPress**: 6.0+
-- **WooCommerce**: 8.0+
+- **WooCommerce**: 10.0+
 - **PHP**: 8.3+
 - **SSL Certificate**: Recommended for production
 
@@ -75,8 +75,8 @@ The plugin works out of the box with WooCommerce. No additional configuration re
 ### Email & PDF Integration (Optional)
 
 For automatic guest payment links in emails and PDFs, see:
-- **[📧 Email Integration Guide](docs/email-integration.md)** - Configure automatic email links
-- **[📄 PDF Integration Guide](docs/pdf-integration.md)** - Configure automatic PDF links
+- **[📧 Email Integration Guide](docs/guides/email-integration.md)** - Configure automatic email links
+- **[📄 PDF Integration Guide](docs/engineering/pdf-integration.md)** - Configure automatic PDF links
 
 **Quick Enable:**
 ```php
@@ -89,7 +89,7 @@ add_filter('wicket/wooguestpay/pdf_integration_enabled', '__return_true');
 
 ### Advanced Configuration
 
-For comprehensive configuration options, filters, and examples, see the **[Configuration Quick Reference](docs/configuration-quick-reference.md)**.
+For comprehensive configuration options, filters, and examples, see the **[Configuration Quick Reference](docs/engineering/configuration-quick-reference.md)**.
 
 **Key Configuration Examples:**
 ```php
@@ -146,15 +146,20 @@ add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $o
 ### Class Structure
 
 ```
-wicket-guest-checkout.php              # Main plugin file
+wicket-guest-checkout.php                        # Main plugin file
 ├── src/
-│   ├── class-wicket-guest-payment.php        # Main coordinator (Singleton)
-│   ├── class-wicket-guest-payment-core.php   # Token & cart management
-│   ├── class-wicket-guest-payment-admin.php  # Admin interface
-│   ├── class-wicket-guest-payment-email.php  # Email notifications
-│   ├── class-wicket-guest-payment-auth.php   # Authentication & restrictions
-│   ├── class-wicket-guest-payment-invoice.php # Invoice integration
-│   └── class-wicket-guest-payment-receipt.php # Receipt management
+│   ├── WicketGuestPayment.php                   # Main coordinator (Singleton)
+│   ├── WicketGuestPaymentCore.php               # Token & cart management
+│   ├── WicketGuestPaymentAdmin.php              # Admin interface
+│   ├── WicketGuestPaymentAdminPay.php           # Admin Pay for Customer flow
+│   ├── WicketGuestPaymentAuth.php               # Authentication & restrictions
+│   ├── WicketGuestPaymentConfig.php             # Configuration management
+│   ├── WicketGuestPaymentEmail.php              # Email notifications
+│   ├── WicketGuestPaymentInvoice.php            # Invoice integration
+│   ├── WicketGuestPaymentReceipt.php            # Receipt management
+│   ├── AbstractWicketGuestPaymentComponent.php  # Abstract base class
+│   ├── TraitWicketGuestPaymentLogger.php        # Logging trait
+│   └── legacy-class-aliases.php                # Backward-compat class aliases
 ```
 
 ### Data Flow
@@ -188,6 +193,8 @@ wicket-guest-checkout.php              # Main plugin file
 - `wgp_map_{key}`: Secure cart key to user ID mapping
 - `wgp_cart_{key}`: Serialized cart data
 - `guest_pay_limit_{ip}`: Rate limiting counter
+- `wgp_admin_pay_{token}`: Admin Pay session data (15-min TTL)
+- `wgp_admin_pay_session_{customer_id}`: Admin Pay cookie/session binding
 
 ## Hooks & Filters
 

@@ -1,3 +1,8 @@
+---
+title: "Email Template Customization"
+audience: [implementer, support]
+---
+
 # Email Template Customization
 
 This guide covers customization of the **admin-sent guest payment email** (the email sent from order admin when generating/sending a guest payment link).
