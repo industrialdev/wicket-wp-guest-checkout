@@ -16,7 +16,7 @@ defined('ABSPATH') || exit;
 /**
  * Shared logger trait.
  *
- * Delegates all logging to the centralized WicketWP\Log via Wicket()->log().
+ * Delegates all logging to the centralized WicketWP\Log via \Wicket()->log().
  * The 'wicket-guest-payment' source is injected automatically so log files
  * are grouped consistently under that identifier.
  */
@@ -38,23 +38,23 @@ trait TraitWicketGuestPaymentLogger
             case 'emergency':
             case 'alert':
             case 'critical':
-                Wicket()->log()->critical($message, $context);
+                \Wicket()->log()->critical($message, $context);
                 break;
             case 'error':
-                Wicket()->log()->error($message, $context);
+                \Wicket()->log()->error($message, $context);
                 break;
             case 'warning':
-                Wicket()->log()->warning($message, $context);
+                \Wicket()->log()->warning($message, $context);
                 break;
             case 'notice':
             case 'info':
-                Wicket()->log()->info($message, $context);
+                \Wicket()->log()->info($message, $context);
                 break;
             case 'debug':
-                Wicket()->log()->debug($message, $context);
+                \Wicket()->log()->debug($message, $context);
                 break;
             default:
-                Wicket()->log()->info($message, $context);
+                \Wicket()->log()->info($message, $context);
         }
     }
 }
