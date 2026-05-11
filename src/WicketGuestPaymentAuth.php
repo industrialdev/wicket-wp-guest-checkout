@@ -174,17 +174,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     }
 
     /**
-     * Prevent WooCommerce Subscriptions from creating a new (duplicate) subscription during
-     * guest checkout when the order already has a subscription relationship.
+     * Prevent WooCommerce Subscriptions from deleting and recreating a subscription during
+     * a pay-for-order checkout when the order already has a subscription relationship.
      *
-     * The full checkout flow triggers WCS's process_checkout (hooked at priority 100 on
-     * woocommerce_checkout_order_processed), which creates new subscriptions from the cart.
-     * For renewal orders, WCS's own cleanup only searches for subscriptions where the order
-     * is the *parent* — it won't find the existing subscription (the order is a child of it),
-     * so WCS creates a second subscription instead of reusing the existing one.
+     * WCS_Cart_Initial_Payment::maybe_setup_cart() copies order coupons into the live cart
+     * on the order-pay page. When the user then submits payment, WCS process_checkout (priority 100)
+     * finds the existing parent subscription, deletes it, and recreates it from the recurring cart —
+     * which now carries the coupon. This guard fires at priority 5 to remove process_checkout
+     * before it can run, preserving the original subscription and all post-creation metadata.
      *
-     * The Admin Pay flow avoids this entirely because it uses the order-pay endpoint, which
-     * never fires woocommerce_checkout_order_processed.
+     * Scoped to pay-for-order flows ($_POST['pay_for_order']) to avoid interfering with
+     * standard new checkouts and switch/resubscribe flows.
      *
      * @hooked woocommerce_checkout_order_processed (priority 5)
      * @hooked woocommerce_store_api_checkout_order_processed (priority 5)
@@ -195,18 +195,22 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function maybe_prevent_duplicate_wcs_subscriptions($order_id, $posted_data = []): void
     {
-        // Only act during guest payment sessions.
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
-            return;
-        }
-
         // Only relevant when WooCommerce Subscriptions is active.
         if (!function_exists('wcs_order_contains_subscription') || !class_exists('WC_Subscriptions_Checkout')) {
             return;
         }
 
+        // Scope to pay-for-order flows only. Standard new checkouts never have a pre-existing
+        // subscription at priority 5, so wcs_order_contains_subscription would return false there
+        // anyway — but scoping here explicitly protects switch/resubscribe re-payment edge cases
+        // where a failed order already carries a subscription relationship.
+        if (!isset($_POST['pay_for_order'])) {
+            return;
+        }
+
         // If the order already has any subscription relationship (parent, renewal, resubscribe, switch),
-        // WCS must not create new subscriptions from the cart — that would be a duplicate.
+        // WCS must not create new subscriptions from the cart — that would delete and recreate the
+        // existing subscription, copying cart coupons onto it and losing post-creation customizations.
         // NOTE: must pass 'any' — the default only checks ['parent','resubscribe','switch'] and
         // misses renewal orders, which is exactly the case that causes the duplicate subscription.
         if (wcs_order_contains_subscription($order_id, 'any')) {
