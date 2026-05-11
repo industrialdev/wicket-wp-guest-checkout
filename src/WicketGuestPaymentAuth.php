@@ -208,6 +208,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
+        $this->log(sprintf(
+            'SUBSCRIPTION GUARD: Pay-for-order flow detected for order #%d. Checking for existing subscription relationship.',
+            $order_id
+        ), 'debug');
+
         // If the order already has any subscription relationship (parent, renewal, resubscribe, switch),
         // WCS must not create new subscriptions from the cart — that would delete and recreate the
         // existing subscription, copying cart coupons onto it and losing post-creation customizations.
@@ -221,6 +226,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             ));
             remove_action('woocommerce_checkout_order_processed', ['WC_Subscriptions_Checkout', 'process_checkout'], 100);
             remove_action('woocommerce_store_api_checkout_order_processed', ['WC_Subscriptions_Checkout', 'process_checkout'], 100);
+        } else {
+            $this->log(sprintf(
+                'SUBSCRIPTION GUARD: Order #%d has no existing subscription relationship. WCS process_checkout will run normally.',
+                $order_id
+            ), 'debug');
         }
     }
 
@@ -718,9 +728,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     setcookie(self::GUEST_SESSION_COOKIE, '1', time() + HOUR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
                     // Ensure no WC session variable is set here for guest state tracking
 
-                    //$this->log(
-                    //    sprintf('User ID: %d authenticated successfully via token. Original Order ID: %d stored. Guest session flag cookie set.', $user_id, $order->get_id())
-                    //);
+                    $this->log(sprintf(
+                        'GUEST AUTH: User #%d authenticated via token for order #%d. Guest session cookie set.',
+                        $user_id,
+                        $order->get_id()
+                    ));
 
                     // Clear the rate limit transient on success only if rate limiting is active
                     if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {

@@ -250,12 +250,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         // Add the order items to the cart
         $items_added = false;
         $item_count = count($order->get_items());
+        $coupon_count = count($order->get_coupons());
 
-        // Log the order items for debugging
-
-        //$this->log(
-        //    sprintf('Preparing cart for Order ID: %d with %d items', $order->get_id(), $item_count)
-        //);
+        $this->log(sprintf(
+            'CART PREP: Starting cart preparation for order #%d — %d product item(s), %d coupon(s) on order (coupons are NOT added to cart, intentional).',
+            $order->get_id(),
+            $item_count,
+            $coupon_count
+        ));
 
         // Check if order has any items at all
         if ($item_count === 0) {
@@ -521,9 +523,12 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             WC()->session->set('cart', WC()->cart->get_cart_for_session());
             WC()->session->save_data(); // Ensure session is saved after all items + calc.
 
-            //$this->log(
-            //    sprintf('Cart preparation completed for Order ID: %d. Final cart count: %d', $order->get_id(), WC()->cart->get_cart_contents_count())
-            //);
+            $this->log(sprintf(
+                'CART PREP: Completed for order #%d — %d item(s) in cart, %d applied coupon(s) (expected: 0).',
+                $order->get_id(),
+                WC()->cart->get_cart_contents_count(),
+                count(WC()->cart->get_applied_coupons())
+            ));
         }
 
         return $items_added;
@@ -1366,6 +1371,13 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         $user_id = $order->get_user_id();
+
+        $this->log(sprintf(
+            'PAYMENT COMPLETE: Order #%d (status: %s, user: %d). Invalidating guest token.',
+            $order_id,
+            $order->get_status(),
+            $user_id
+        ));
 
         $this->invalidate_token_for_order($order_id); // Existing method handles logging success/failure
     }
