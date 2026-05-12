@@ -7,7 +7,15 @@ audience: [implementer, support]
 
 This guide covers both email-related features in Wicket Guest Checkout.
 
-## Two Email Features
+## Email Features Overview
+
+### Automatic CC on Post-Payment Emails
+
+When a guest payment completes, the plugin automatically CCs the guest's email (`_wgp_guest_payment_email` order meta) on the WooCommerce `customer_completed_order` and `customer_processing_order` emails. No configuration required — this is always active when a guest email is on the order.
+
+---
+
+## Two Configurable Email Features
 
 ### 1. WooCommerce Email Integration Message
 

@@ -55,7 +55,7 @@ Full HTML body for the admin-sent guest payment email. No auto-paragraph formatt
 
 **Available placeholders:** `{site_name}`, `{member_name}`, `{order_number}`, `{order_total}`, `{payment_link}`, `{payment_url}`, `{expiry_date}`, `{subscription_details}`.
 
-- `{payment_link}` renders a full `<a>` element — do not use it inside an `href` attribute.
+- `{payment_link}` renders a full `<a>` element — do not use it inside an `href` attribute. If you do, the plugin will show an admin warning on save.
 - Upload images via the Media Library and reference them by URL.
 
 ## Integration Toggles

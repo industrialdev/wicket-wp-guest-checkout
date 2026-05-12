@@ -113,7 +113,7 @@ add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $o
 - **Token Expiry:** 7 days (configurable)
 - **Rate Limiting:** 5 attempts per 15 minutes per IP
 - **Email Integration:** Disabled by default
-- **PDF Integration:** Disabled by default
+- **PDF Integration:** Enabled by default
 
 ## Usage
 
@@ -220,11 +220,14 @@ apply_filters('wicket_guest_payment_allowed_order_statuses', $statuses);
 // Modify allowed subscription statuses
 apply_filters('wicket_guest_payment_allowed_subscription_statuses', $statuses);
 
-// Customize email subject
-apply_filters('wicket_guest_payment_email_subject', $subject, $order);
+// Customize email subject (6 args)
+apply_filters('wicket_guest_payment_email_subject', $subject, $order, $token, $placeholders, $recipient_email, $user_data);
 
-// Customize email content
-apply_filters('wicket_guest_payment_email_content', $content, $order, $token);
+// Customize email content (6 args)
+apply_filters('wicket_guest_payment_email_content', $html, $order, $token, $placeholders, $recipient_email, $user_data);
+
+// Customize email headers (6 args)
+apply_filters('wicket_guest_payment_email_headers', $headers, $order, $token, $placeholders, $recipient_email, $user_data);
 ```
 
 ## Development
