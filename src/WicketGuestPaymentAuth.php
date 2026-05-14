@@ -167,10 +167,117 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             $this->log(sprintf('force_reuse_guest_payment_order: Cart hash matches for order #%d: %s', $original_order_id, $current_cart_hash));
         }
 
+        // Ensure payment method is set on the reused order.
+        // When woocommerce_create_order returns an order ID, WC core skips
+        // the set_payment_method() call at line 456 of class-wc-checkout.php.
+        // We must set it here or _payment_method / _payment_method_title
+        // postmeta will be empty, leaving the admin order screen blank.
+        $this->ensure_payment_method_on_reused_order($original_order, $checkout);
+
         $this->log(sprintf('DUPLICATE PREVENTION: Forcing reuse of original order #%d for user %d (prevented creation of new order).', $original_order_id, $user_id));
 
         // Return the original order ID to prevent duplicate creation
         return (int) $original_order_id;
+    }
+
+    /**
+     * Ensure payment method is persisted on a reused guest payment order.
+     *
+     * When force_reuse_guest_payment_order returns an order ID via the
+     * woocommerce_create_order filter, WC core returns early and never reaches
+     * set_payment_method() in class-wc-checkout.php. This method fills that gap.
+     *
+     * Payment method is only set when the order's _payment_method is currently
+     * empty, to avoid overwriting a method that was already correctly assigned.
+     *
+     * @param WC_Order    $original_order The order being reused.
+     * @param WC_Checkout $checkout       The checkout object.
+     * @return void
+     */
+    private function ensure_payment_method_on_reused_order(WC_Order $original_order, WC_Checkout $checkout): void
+    {
+        // Only act when payment method is actually empty on the order.
+        // This is a guard against double-invocation and also avoids
+        // overwriting a method that was already correctly set.
+        $current_method = $original_order->get_payment_method();
+        if (!empty($current_method)) {
+            $this->log(sprintf(
+                'PAYMENT METHOD SKIP: Order #%d already has payment_method="%s". Not overwriting.',
+                $original_order->get_id(),
+                $current_method
+            ), 'debug');
+
+            return;
+        }
+
+        // Resolve the chosen payment method slug from the best available source.
+        // 1. $_POST['payment_method'] — present during classic + block checkout.
+        // 2. WC()->session->get('chosen_payment_method') — set before checkout posts.
+        // 3. $checkout->get_value('payment_method') — WC_Checkout posted-data accessor.
+        $payment_method_slug = null;
+
+        if (!empty($_POST['payment_method'])) {
+            $payment_method_slug = wc_clean(wp_unslash($_POST['payment_method']));
+        } elseif (WC()->session && WC()->session->get('chosen_payment_method')) {
+            $payment_method_slug = wc_clean(WC()->session->get('chosen_payment_method'));
+        } elseif (method_exists($checkout, 'get_value')) {
+            $posted = $checkout->get_value('payment_method');
+            if (!empty($posted)) {
+                $payment_method_slug = wc_clean($posted);
+            }
+        }
+
+        if (empty($payment_method_slug)) {
+            $this->log(sprintf(
+                'PAYMENT METHOD SKIP: Could not resolve payment_method slug for order #%d. ' .
+                'POST: %s, Session: %s',
+                $original_order->get_id(),
+                isset($_POST['payment_method']) ? wc_clean(wp_unslash($_POST['payment_method'])) : 'not set',
+                WC()->session ? WC()->session->get('chosen_payment_method') ?? 'not set' : 'no session'
+            ), 'warning');
+
+            return;
+        }
+
+        // Resolve the gateway object from the slug.
+        // We use get_available_payment_gateways() to pick up the display title.
+        $available_gateways = WC()->payment_gateways
+            ? WC()->payment_gateways->get_available_payment_gateways()
+            : [];
+
+        // Fallback: if the gateway isn't in available_gateways (e.g., admin/cron context
+        // where Moneris may not be registered as "available"), try payment_gateways() instead.
+        if (!isset($available_gateways[$payment_method_slug])) {
+            $all_gateways = WC()->payment_gateways
+                ? WC()->payment_gateways->payment_gateways()
+                : [];
+            if (isset($all_gateways[$payment_method_slug])) {
+                $available_gateways[$payment_method_slug] = $all_gateways[$payment_method_slug];
+            }
+        }
+
+        if (isset($available_gateways[$payment_method_slug])) {
+            $gateway = $available_gateways[$payment_method_slug];
+            $original_order->set_payment_method($gateway);
+
+            $this->log(sprintf(
+                'PAYMENT METHOD FIX: Set payment_method="%s" (title="%s") on reused order #%d.',
+                $payment_method_slug,
+                $gateway->get_title(),
+                $original_order->get_id()
+            ));
+
+            // Only save if the method actually changed to avoid unnecessary writes.
+            $original_order->save();
+        } else {
+            $this->log(sprintf(
+                'PAYMENT METHOD SKIP: Gateway "%s" not found in available gateways for order #%d. ' .
+                'Available: %s',
+                $payment_method_slug,
+                $original_order->get_id(),
+                implode(', ', array_keys($available_gateways))
+            ), 'warning');
+        }
     }
 
     /**
@@ -1094,9 +1201,20 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 $order->add_order_note(__('Guest payment completed using token link. User logged out.', 'wicket-wgc'));
                 $order->save();
 
-                //$this->log(
-                //    sprintf('Guest payment cleanup: Session ended for Order ID: %d.', $order_id)
-                //);
+                // Diagnostic: log the order's payment method state at cleanup time.
+                // This catches cases where _payment_method is still empty after payment,
+                // which would indicate ensure_payment_method_on_reused_order failed silently
+                // or a gateway cleared the value during process_payment().
+                $pm = $order->get_payment_method();
+                $pm_title = $order->get_payment_method_title();
+                $this->log(sprintf(
+                    'PAYMENT STATE AT CLEANUP: Order #%d — payment_method=%s, payment_method_title=%s, status=%s, created_via=%s.',
+                    $order_id,
+                    $pm ?: 'EMPTY',
+                    $pm_title ?: 'EMPTY',
+                    $order->get_status(),
+                    $order->get_created_via()
+                ), $pm ? 'debug' : 'warning');
             }
 
             // Get user ID before clearing auth cookie, needed for user meta cleanup
