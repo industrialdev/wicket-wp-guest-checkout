@@ -67,6 +67,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Hook to clear the guest session flag on standard logout
         add_action('wp_logout', [$this, 'clear_guest_session_flag']);
+        // NOTE: Stale guest session meta cleanup on wp_login is intentionally omitted.
+        // The risk (silent auth-cookie expiry leaving _wgp_guest_session_token_validation behind
+        // between sessions) is extremely low. The meta is cleaned on explicit wp_logout and during
+        // is_guest_payment_session() validation when order context is invalid.
 
         // Ensure the woocommerce_thankyou hook for clear_guest_session_flag is removed
         // Cleanup after successful payment
@@ -115,11 +119,18 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         //$wc_session_order = WC()->session ? WC()->session->get('order_awaiting_payment') : 'session_not_available';
         //$this->log(sprintf('force_reuse_guest_payment_order hook called. Input order_id: %s, WC session order_awaiting_payment: %s', $order_id ?? 'null', $wc_session_order ?? 'not_set'));
 
-        // Check if this is a guest payment session
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
-            $this->log('force_reuse_guest_payment_order: Guest session cookie not set. Allowing WC to create new order.');
-
+        // Check if this is a guest payment session (cookie OR user meta)
+        // Using is_guest_payment_session() ensures enforcement even when cookie is lost,
+        // as long as _wgp_guest_session_token_validation exists in user meta.
+        $is_guest_session = $this->core->is_guest_payment_session();
+        if (!$is_guest_session) {
+            // Not a guest payment session - allow WC normal behavior
             return $order_id ? (int) $order_id : 0;
+        }
+
+        $has_cookie = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        if (!$has_cookie) {
+            $this->log('force_reuse_guest_payment_order: Guest session detected via user meta but cookie missing. Enforcing order reuse anyway.', 'warning');
         }
 
         $user_id = get_current_user_id();
@@ -351,9 +362,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function validate_guest_payment_order_before_checkout(): void
     {
-        // Only run for guest payment sessions
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        // Check if this is a guest payment session (cookie OR user meta)
+        // Using is_guest_payment_session() ensures enforcement even when cookie is lost,
+        // as long as _wgp_guest_session_token_validation exists in user meta.
+        $is_guest_session = $this->core->is_guest_payment_session();
+        if (!$is_guest_session) {
             return;
+        }
+
+        $has_cookie = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        if (!$has_cookie) {
+            $this->log('HARD STOPPER: Guest session detected via user meta but cookie missing. Enforcing validation anyway.', 'warning');
         }
 
         $user_id = get_current_user_id();
@@ -374,8 +393,6 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // Check WooCommerce session for order_awaiting_payment
-        $session_order_id = WC()->session ? WC()->session->get('order_awaiting_payment') : null;
-
         $session_order_id = WC()->session ? WC()->session->get('order_awaiting_payment') : null;
 
         //$this->log(
@@ -460,9 +477,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function validate_guest_payment_order_before_payment_block(WC_Order $order, WP_Error $validation_errors): void
     {
-        // Only run for guest payment sessions
-        if (!isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        // Check if this is a guest payment session (cookie OR user meta)
+        // Using is_guest_payment_session() ensures enforcement even when cookie is lost,
+        // as long as _wgp_guest_session_token_validation exists in user meta.
+        $is_guest_session = $this->core->is_guest_payment_session();
+        if (!$is_guest_session) {
             return;
+        }
+
+        $has_cookie = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        if (!$has_cookie) {
+            $this->log('HARD STOPPER (Block): Guest session detected via user meta but cookie missing. Enforcing validation anyway.', 'warning');
         }
 
         $user_id = get_current_user_id();
@@ -545,7 +570,12 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     }
 
     /**
-     * Clear the guest session flag cookie on logout.
+     * Clear the guest session flag cookie and user meta on logout.
+     *
+     * Must clean BOTH cookie AND user meta (_wgp_guest_session_token_validation)
+     * because is_guest_payment_session() checks either one. Stale meta would cause
+     * false positives: page restrictions, cart emptying, checkout blocking on
+     * subsequent normal logins.
      */
     public function clear_guest_session_flag(): void
     {
@@ -557,11 +587,27 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 'secure' => is_ssl(),
                 'httponly' => true,
             ]);
+        }
 
-            //$this->log('Cleared guest session flag cookie on logout.');
+        // Clean up user meta so is_guest_payment_session() doesn't false-positive.
+        // NOT deleting _wgp_original_order_id — needed if user re-enters via token link.
+        $user_id = get_current_user_id();
+        if ($user_id) {
+            delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+            $this->log(sprintf('Cleared guest session flag for user %d.', $user_id));
         }
     }
 
+    /**
+     * Cleanup stale guest session meta on login when cookie is absent.
+     *
+     * Cookie absence alone does not make the session stale: valid meta fallback must survive.
+     * Remove only when original order context is invalid for the logging-in user.
+     *
+     * @param string $user_login The user's login.
+     * @param mixed  $user       The logged-in user object.
+     * @return void
+     */
     /**
      * Restore cart from transient if the wgp_cart_key parameter is present.
      * This ensures cart contents persist across the redirect.
@@ -1056,8 +1102,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         // Restriction Part
-        // Check if this is a guest payment session using only the cookie
-        $is_guest_session = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        // Check if this is a guest payment session (cookie OR user meta)
+        $is_guest_session = $this->core->is_guest_payment_session();
 
         if ($is_guest_session) {
             //$this->log('Guest payment session active for user ID: ' . get_current_user_id() . '. Applying restrictions (checked cookie).');
@@ -1161,8 +1207,16 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function cleanup_after_payment(int $order_id): void
     {
-        // Check if this was a guest payment session using the cookie
-        if (isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        // Check if this was a guest payment session (cookie OR raw user meta).
+        // NOTE: Do NOT use is_guest_payment_session() here. That method validates
+        // order status (pending/failed/on-hold), but at cleanup time the order has
+        // already transitioned to 'processing' — causing the check to fail and skip
+        // cleanup entirely (guest stays logged in).
+        $has_cookie = $this->core->has_guest_session_cookie();
+        $user_id    = get_current_user_id();
+        $has_meta   = $user_id ? !empty(get_user_meta($user_id, '_wgp_guest_session_token_validation', true)) : false;
+
+        if ($has_cookie || $has_meta) {
             // Ensure no session variable is checked or cleared here
 
             // The $order_id passed here is for the NEW order just created by the checkout.
@@ -1369,8 +1423,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
-        // Check if this is a guest session
-        if (isset($_COOKIE[self::GUEST_SESSION_COOKIE])) {
+        // Check if this is a guest session (cookie OR user meta)
+        if ($this->core->is_guest_payment_session()) {
             // Clear auth cookies
             wp_clear_auth_cookie();
 
@@ -1394,7 +1448,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      */
     public function maybe_hide_admin_bar(bool $show): bool
     {
-        $cookie_set = isset($_COOKIE[self::GUEST_SESSION_COOKIE]);
+        $cookie_set = $this->core->is_guest_payment_session();
 
         // If the guest session cookie is set, remove the theme's filter and hide the admin bar
         if ($cookie_set) {

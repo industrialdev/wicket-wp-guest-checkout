@@ -1737,14 +1737,42 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         }
 
         $user_id = get_current_user_id();
-        if ($user_id) {
-            $session_flag = get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
-            if (!empty($session_flag)) {
-                return true;
-            }
+        if (!$user_id) {
+            return false;
         }
 
-        return false;
+        $session_flag = get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
+        if (empty($session_flag)) {
+            return false;
+        }
+
+        $original_order_id = get_user_meta($user_id, '_wgp_original_order_id', true);
+        if (empty($original_order_id) || !is_numeric($original_order_id)) {
+            delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+
+            return false;
+        }
+
+        $original_order = wc_get_order((int) $original_order_id);
+        if (!$original_order) {
+            delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+
+            return false;
+        }
+
+        if ((int) $original_order->get_user_id() !== (int) $user_id) {
+            delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+
+            return false;
+        }
+
+        if (!$original_order->has_status(['pending', 'failed', 'on-hold'])) {
+            delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
