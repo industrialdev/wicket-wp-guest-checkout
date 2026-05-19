@@ -41,8 +41,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         // Core class can be instantiated directly without going through the singleton
         // This allows independent usage of the Core class
 
-        // Set up hooks
-        $this->init();
+        // Initialization is handled via init() method called by the singleton or manually
     }
 
     /**
