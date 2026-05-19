@@ -34,6 +34,13 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     private int $token_expiry_days = 7;
 
     /**
+     * Cache for guest session detection within a single request.
+     *
+     * @var bool|null
+     */
+    private static ?bool $is_guest_session_cache = null;
+
+    /**
      * Constructor.
      */
     public function __construct()
@@ -1731,47 +1738,77 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      */
     public function is_guest_payment_session(): bool
     {
+        if (null !== self::$is_guest_session_cache) {
+            return self::$is_guest_session_cache;
+        }
+
         if ($this->has_guest_session_cookie()) {
-            return true;
+            return self::$is_guest_session_cache = true;
         }
 
         $user_id = get_current_user_id();
         if (!$user_id) {
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
+        // GATE: Only proceed to check metadata if we have clear evidence of a guest flow.
+        // This prevents regular members with stale meta from being trapped in a guest session.
+        // Evidence 1: URL triggers used to initiate or transit the flow.
+        $has_url_trigger = !empty($_GET['guest_payment_token']) || !empty($_GET['wgp_cart_key']);
+
+        // Evidence 2: Active order in the WC session matches the original guest order in meta.
+        // This ensures continuity on Checkout/Thank You pages even if the cookie is lost.
+        $original_order_id = get_user_meta($user_id, '_wgp_original_order_id', true);
+        $session_order_id = (isset(WC()->session)) ? WC()->session->get('order_awaiting_payment') : null;
+        $is_matching_session = $session_order_id && $original_order_id && (int) $session_order_id === (int) $original_order_id;
+
+        if (!$has_url_trigger && !$is_matching_session) {
+            return self::$is_guest_session_cache = false;
+        }
+
+        // If triggered or matching, perform the strict validation from commit 5ae45fef
         $session_flag = get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
         if (empty($session_flag)) {
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
-        $original_order_id = get_user_meta($user_id, '_wgp_original_order_id', true);
         if (empty($original_order_id) || !is_numeric($original_order_id)) {
             delete_user_meta($user_id, '_wgp_guest_session_token_validation');
 
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
         $original_order = wc_get_order((int) $original_order_id);
         if (!$original_order) {
             delete_user_meta($user_id, '_wgp_guest_session_token_validation');
 
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
         if ((int) $original_order->get_user_id() !== (int) $user_id) {
             delete_user_meta($user_id, '_wgp_guest_session_token_validation');
 
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
         if (!$original_order->has_status(['pending', 'failed', 'on-hold'])) {
             delete_user_meta($user_id, '_wgp_guest_session_token_validation');
 
-            return false;
+            return self::$is_guest_session_cache = false;
         }
 
-        return true;
+        return self::$is_guest_session_cache = true;
+    }
+
+    /**
+     * Resets the guest session cache.
+     * Useful for testing purposes or when session state changes mid-request.
+     *
+     * @return void
+     */
+    public static function reset_session_cache(): void
+    {
+        self::$is_guest_session_cache = null;
     }
 
     /**

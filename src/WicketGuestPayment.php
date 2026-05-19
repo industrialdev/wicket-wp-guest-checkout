@@ -279,10 +279,7 @@ class WicketGuestPayment
         add_filter(
             'woocommerce_is_purchasable',
             function (bool $is_purchasable, WC_Product $product): bool {
-                $user_id = get_current_user_id();
-                $is_guest_session = $user_id && get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
-
-                if ($is_guest_session) {
+                if ($this->core->is_guest_payment_session()) {
                     return true;
                 }
 
@@ -296,10 +293,7 @@ class WicketGuestPayment
         add_filter(
             'woocommerce_variation_is_visible',
             function (bool $is_visible, int $variation_id, int $parent_id, WC_Product_Variation $variation): bool {
-                $user_id = get_current_user_id();
-                $is_guest_session = $user_id && get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
-
-                if ($is_guest_session) {
+                if ($this->core->is_guest_payment_session()) {
                     return true;
                 }
 
@@ -313,10 +307,7 @@ class WicketGuestPayment
         add_filter(
             'woocommerce_cart_item_required_stock_is_not_enough',
             function (bool $not_enough, WC_Product $product, array $values): bool {
-                $user_id = get_current_user_id();
-                $is_guest_session = $user_id && get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
-
-                if ($is_guest_session) {
+                if ($this->core->is_guest_payment_session()) {
                     return false;
                 }
 
@@ -330,10 +321,7 @@ class WicketGuestPayment
         add_action(
             'woocommerce_check_cart_items',
             function (): void {
-                $user_id = get_current_user_id();
-                $is_guest_session = $user_id && get_user_meta($user_id, '_wgp_guest_session_token_validation', true);
-
-                if ($is_guest_session && WC()->cart) {
+                if ($this->core->is_guest_payment_session() && WC()->cart) {
                     $cart = WC()->cart->get_cart();
                     $has_custom_price_item = false;
                     foreach ($cart as $cart_item) {
@@ -345,6 +333,7 @@ class WicketGuestPayment
 
                     if (!$has_custom_price_item) {
                         // Try to re-add from user meta
+                        $user_id = get_current_user_id();
                         $cart_data = get_user_meta($user_id, '_wgp_cart_data', true);
                         if ($cart_data && is_array($cart_data)) {
                             foreach ($cart_data as $item_key => $item_data) {

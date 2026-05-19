@@ -67,9 +67,12 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
         // Hook to clear the guest session flag on standard logout
         add_action('wp_logout', [$this, 'clear_guest_session_flag']);
-        // NOTE: Stale guest session meta cleanup on wp_login is intentionally omitted.
-        // The risk (silent auth-cookie expiry leaving _wgp_guest_session_token_validation behind
-        // between sessions) is extremely low. The meta is cleaned on explicit wp_logout and during
+
+        // Cleanup stale guest session meta on normal login to prevent regular members
+        // from being incorrectly identified as guests due to orphaned metadata.
+        add_action('wp_login', [$this, 'cleanup_stale_guest_meta_on_login'], 10, 2);
+
+        // NOTE: The meta is also cleaned on explicit wp_logout and during
         // is_guest_payment_session() validation when order context is invalid.
 
         // Ensure the woocommerce_thankyou hook for clear_guest_session_flag is removed
@@ -570,6 +573,36 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
     }
 
     /**
+     * Cleanup stale guest session meta on login when not entering via guest flow.
+     *
+     * @param string $user_login The user's login.
+     * @param mixed  $user       The logged-in user object.
+     * @return void
+     */
+    public function cleanup_stale_guest_meta_on_login(string $user_login, $user): void
+    {
+        // If logging in via guest token/link, Auth class handles it manually
+        // via wp_set_auth_cookie() and doesn't trigger the 'wp_login' hook.
+        // If this hook fires, it's a normal login via wp-login.php or wp_signon().
+
+        // SAFETY GUARD: If we are entering via a guest link, do NOT clean up.
+        if (!empty($_GET['guest_payment_token']) || !empty($_GET['wgp_cart_key'])) {
+            return;
+        }
+
+        if ($user && isset($user->ID)) {
+            delete_user_meta($user->ID, '_wgp_guest_session_token_validation');
+            delete_user_meta($user->ID, '_wgp_original_order_id');
+            delete_user_meta($user->ID, '_wgp_cart_data');
+            delete_user_meta($user->ID, '_wgp_cart_key');
+
+            WicketGuestPaymentCore::reset_session_cache();
+
+            //$this->log(sprintf('Cleaned up stale guest metadata for user %d on login.', $user->ID));
+        }
+    }
+
+    /**
      * Clear the guest session flag cookie and user meta on logout.
      *
      * Must clean BOTH cookie AND user meta (_wgp_guest_session_token_validation)
@@ -594,6 +627,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $user_id = get_current_user_id();
         if ($user_id) {
             delete_user_meta($user_id, '_wgp_guest_session_token_validation');
+            WicketGuestPaymentCore::reset_session_cache();
             $this->log(sprintf('Cleared guest session flag for user %d.', $user_id));
         }
     }
@@ -877,8 +911,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     update_user_meta($user_id, '_wgp_original_order_id', $order->get_id());
 
                     // Set the temporary guest session flag cookie
-                    // Expires in 1 hour, secure if SSL, httpOnly
-                    setcookie(self::GUEST_SESSION_COOKIE, '1', time() + HOUR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+                    // Sync expiry with WC default session (48 hours) to prevent dual-expiry regressions
+                    $cookie_expiry = (int) apply_filters('wc_session_expiration', 2 * DAY_IN_SECONDS);
+                    setcookie(self::GUEST_SESSION_COOKIE, '1', time() + $cookie_expiry, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
                     // Ensure no WC session variable is set here for guest state tracking
 
                     $this->log(sprintf(
