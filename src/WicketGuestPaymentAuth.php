@@ -296,16 +296,34 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
     /**
      * Prevent WooCommerce Subscriptions from deleting and recreating a subscription during
-     * a pay-for-order checkout when the order already has a subscription relationship.
+     * a checkout that reuses an existing parent order with an existing subscription.
      *
-     * WCS_Cart_Initial_Payment::maybe_setup_cart() copies order coupons into the live cart
-     * on the order-pay page. When the user then submits payment, WCS process_checkout (priority 100)
-     * finds the existing parent subscription, deletes it, and recreates it from the recurring cart —
-     * which now carries the coupon. This guard fires at priority 5 to remove process_checkout
-     * before it can run, preserving the original subscription and all post-creation metadata.
+     * Two flows are covered:
      *
-     * Scoped to pay-for-order flows ($_POST['pay_for_order']) to avoid interfering with
-     * standard new checkouts and switch/resubscribe flows.
+     *  1. The WC My Account "pay for order" flow (/checkout/order-pay/?pay_for_order=true).
+     *     WCS_Cart_Initial_Payment::maybe_setup_cart() copies the order's line items and
+     *     coupons into the live cart on the order-pay page. On submission, WCS
+     *     process_checkout (priority 100) finds the existing parent subscription, deletes
+     *     it, and recreates it from the recurring cart — losing any post-creation edits
+     *     and (in the original bug report) copying cart coupons onto the new subscription.
+     *
+     *  2. The guest payment email link flow (?guest_payment_token=…).
+     *     WicketGuestPaymentCore::prepare_cart_from_order() restores the order's items
+     *     into the cart and the customer pays via the standard /checkout/ page (no
+     *     pay_for_order POST). The same WCS process_checkout then deletes and recreates
+     *     the subscription. If an admin had edited the parent order before payment
+     *     (e.g. replacing recurring products with prorated/initiation simple products),
+     *     the recreated subscription is missing those recurring products entirely —
+     *     and any downstream membership-creation logic that reads the subscription's
+     *     line items silently produces nothing.
+     *
+     * This guard fires at priority 5 to remove process_checkout before it can run,
+     * preserving the original subscription and all post-creation metadata.
+     *
+     * Scoped to the two flows above to avoid interfering with standard new checkouts
+     * and switch/resubscribe flows. The wcs_order_contains_subscription('any') check
+     * provides the final safety net — it only removes the WCS hook when the order
+     * already has a subscription relationship.
      *
      * @hooked woocommerce_checkout_order_processed (priority 5)
      * @hooked woocommerce_store_api_checkout_order_processed (priority 5)
@@ -321,16 +339,21 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
-        // Scope to pay-for-order flows only. Standard new checkouts never have a pre-existing
-        // subscription at priority 5, so wcs_order_contains_subscription would return false there
-        // anyway — but scoping here explicitly protects switch/resubscribe re-payment edge cases
-        // where a failed order already carries a subscription relationship.
-        if (!isset($_POST['pay_for_order'])) {
+        // Scope: either the WC pay-for-order flow OR a guest payment session.
+        // Both reuse an existing parent order; only those flows can land at this
+        // hook with an order that already carries a subscription relationship.
+        // The is_guest_payment_session() check catches the guest payment email
+        // link flow, which goes through /cart/ → /checkout/ and does not submit
+        // a pay_for_order POST.
+        $is_pay_for_order = isset($_POST['pay_for_order']);
+        $is_guest_payment = $this->core->is_guest_payment_session();
+        if (!$is_pay_for_order && !$is_guest_payment) {
             return;
         }
 
         $this->log(sprintf(
-            'SUBSCRIPTION GUARD: Pay-for-order flow detected for order #%d. Checking for existing subscription relationship.',
+            'SUBSCRIPTION GUARD: %s flow detected for order #%d. Checking for existing subscription relationship.',
+            $is_pay_for_order ? 'Pay-for-order' : 'Guest payment',
             $order_id
         ), 'debug');
 
