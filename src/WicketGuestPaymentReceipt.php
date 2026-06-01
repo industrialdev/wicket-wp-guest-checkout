@@ -368,9 +368,11 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         // Build email content
         $message = $this->get_receipt_email_content($order, $email);
 
+        $from_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
-            'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>',
+            'From: ' . $from_name . ' <' . get_option('admin_email') . '>',
         ];
 
         $sent = wp_mail($email, $subject, $message, $headers);

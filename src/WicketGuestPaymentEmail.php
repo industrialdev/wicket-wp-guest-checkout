@@ -164,9 +164,11 @@ class WicketGuestPaymentEmail extends WicketGuestPaymentComponent
         }
         $message = $this->get_styled_email_template($message);
 
+        $from_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
-            'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>',
+            'From: ' . $from_name . ' <' . get_option('admin_email') . '>',
         ];
         $headers = (array) apply_filters(
             'wicket_guest_payment_email_headers',
