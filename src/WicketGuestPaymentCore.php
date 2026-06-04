@@ -259,11 +259,13 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $coupon_count = count($order->get_coupons());
 
         $this->log(sprintf(
-            'CART PREP: Starting cart preparation for order #%d — %d product item(s), %d coupon(s) on order (coupons are NOT added to cart, intentional).',
+            'CART PREP: Starting cart preparation for order #%d — %d product item(s), %d coupon(s) on order (coupons are NOT added to cart, intentional). WC cart=%s, WC session=%s.',
             $order->get_id(),
             $item_count,
-            $coupon_count
-        ));
+            $coupon_count,
+            WC()->cart ? 'loaded' : 'NULL',
+            WC()->session ? 'loaded' : 'NULL'
+        ), 'error');
 
         // Check if order has any items at all
         if ($item_count === 0) {
@@ -282,12 +284,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             // Ensure we are only processing product line items
             if (!is_a($item, 'WC_Order_Item_Product')) {
 
-                //$this->log(
-                //    sprintf('Skipping non-product item in Order ID: %d, Item ID: %d', $order->get_id(), $item_id)
-                //);
-
                 continue; // Skip fees, shipping, etc.
             }
+
+            $this->log(sprintf(
+                'CART PREP ITEM: Processing order item %d for order #%d.',
+                $item_id,
+                $order->get_id()
+            ), 'error');
 
             $product_id = $item->get_product_id();
             $quantity = $item->get_quantity();
@@ -377,6 +381,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 // Get the cart item key to verify addition was successful
                 $cart_item_key = WC()->cart->add_to_cart($product_id, $quantity, $variation_id, $variation_attributes, $cart_item_data);
 
+                $this->log(sprintf(
+                    'CART PREP ADD: add_to_cart for product_id=%d (variation=%d) in order #%d returned: %s.',
+                    $product_id,
+                    $variation_id,
+                    $order->get_id(),
+                    $cart_item_key ?: 'FALSE (entering fallback path)'
+                ), 'error');
+
                 if ($cart_item_key) {
                     $items_added = true;
 
@@ -436,8 +448,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 } else {                    // Try an alternative approach if the first one fails
 
                     $this->log(
-                        sprintf('First attempt to add product %d failed, trying alternative approach', $product_id),
-                        'warning'
+                        sprintf('CART PREP FALLBACK: add_to_cart failed for product %d (variation=%d) in order #%d. Using set_cart_contents fallback.', $product_id, $variation_id, $order->get_id()),
+                        'error'
                     );
 
                     // Try to manually create a cart item
@@ -506,9 +518,11 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                     WC()->cart->persistent_cart_update();
                     $items_added = true;
 
-                    $this->log(
-                        sprintf('Alternative approach used to add product %d to cart with validation', $product_id)
-                    );
+                    $this->log(sprintf(
+                        'CART PREP FALLBACK: Product %d added via fallback for order #%d.',
+                        $product_id,
+                        $order->get_id()
+                    ), 'error');
                 }
             } catch (Exception $e) {
 
@@ -524,7 +538,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         // If items were successfully added, calculate totals and save the cart session ONCE.
         if ($items_added) {
+            $count_before_calc = WC()->cart->get_cart_contents_count();
+
             WC()->cart->calculate_totals();
+
+            $count_after_calc = WC()->cart->get_cart_contents_count();
+            if ($count_after_calc < $count_before_calc) {
+                $this->log(sprintf(
+                    'CART PREP GUARD IMPACT: calculate_totals() reduced cart from %d to %d items for order #%d. guard_guest_cart_products or WCS hooks likely removed items.',
+                    $count_before_calc,
+                    $count_after_calc,
+                    $order->get_id()
+                ), 'error');
+            }
+
             WC()->cart->persistent_cart_update(); // Ensure cart is written to DB/session
             WC()->session->set('cart', WC()->cart->get_cart_for_session());
             WC()->session->save_data(); // Ensure session is saved after all items + calc.
@@ -534,7 +561,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 $order->get_id(),
                 WC()->cart->get_cart_contents_count(),
                 count(WC()->cart->get_applied_coupons())
-            ));
+            ), 'error');
+        }
+
+        if (!$items_added) {
+            $this->log(sprintf(
+                'CART PREP FAILED: No items were added for order #%d. Returning false. This will trigger cart_prep_failed redirect.',
+                $order->get_id()
+            ), 'error');
         }
 
         return $items_added;
@@ -1639,12 +1673,14 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return;
         }
 
-        //$this->log('Guard: Starting cart validation for guest payment session.', 'debug');
+        $guard_cart_count = $cart->get_cart_contents_count();
+        $this->log(sprintf(
+            'GUARD: Starting cart validation for guest payment session. %d item(s) to validate.',
+            $guard_cart_count
+        ), 'error');
 
         $removed_items = false;
         $cart_contents = $cart->get_cart();
-
-        //$this->log(sprintf('Guard: Found %d items in cart to validate.', count($cart_contents)), 'debug');
 
         foreach ($cart_contents as $cart_item_key => $cart_item) {
             $product_id = isset($cart_item['product_id']) ? (int) $cart_item['product_id'] : 0;
@@ -1658,7 +1694,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             // 1. Validate Product ID
             if ($product_id <= 0) {
                 $cart->remove_cart_item($cart_item_key);
-                $this->log(sprintf('Guard: REMOVED cart item %s: Missing product ID.', $cart_item_key), 'warning');
+                $this->log(sprintf('Guard: REMOVED cart item %s: Missing product ID.', $cart_item_key), 'error');
                 $removed_items = true;
                 continue;
             }
@@ -1667,7 +1703,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             if (!isset($cart_item['data']) || !($cart_item['data'] instanceof WC_Product)) {
                 $this->log(
                     sprintf('Guard: Cart item %s has invalid data object. Type: %s', $cart_item_key, isset($cart_item['data']) ? gettype($cart_item['data']) : 'not set'),
-                    'warning'
+                    'error'
                 );
 
                 // Try to load the correct product
@@ -1689,7 +1725,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             $parent_product = wc_get_product($product_id);
             if (!$parent_product || !$parent_product->exists()) {
                 $cart->remove_cart_item($cart_item_key);
-                $this->log(sprintf('Guard: REMOVED cart item %s: Parent product %d not found.', $cart_item_key, $product_id), 'warning');
+                $this->log(sprintf('Guard: REMOVED cart item %s: Parent product %d not found.', $cart_item_key, $product_id), 'error');
                 $removed_items = true;
                 continue;
             }
@@ -1698,7 +1734,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             if ($parent_product->is_type('variable') || $parent_product->is_type('variable-subscription')) {
                 if ($variation_id <= 0) {
                     $cart->remove_cart_item($cart_item_key);
-                    $this->log(sprintf('Guard: REMOVED cart item %s: Variable product %d has no variation ID.', $cart_item_key, $product_id), 'warning');
+                    $this->log(sprintf('Guard: REMOVED cart item %s: Variable product %d has no variation ID.', $cart_item_key, $product_id), 'error');
                     $removed_items = true;
                     continue;
                 }
@@ -1706,7 +1742,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 $variation_product = wc_get_product($variation_id);
                 if (!$variation_product || !$variation_product->exists()) {
                     $cart->remove_cart_item($cart_item_key);
-                    $this->log(sprintf('Guard: REMOVED cart item %s: Variation %d not found for product %d.', $cart_item_key, $variation_id, $product_id), 'warning');
+                    $this->log(sprintf('Guard: REMOVED cart item %s: Variation %d not found for product %d.', $cart_item_key, $variation_id, $product_id), 'error');
                     $removed_items = true;
                     continue;
                 }

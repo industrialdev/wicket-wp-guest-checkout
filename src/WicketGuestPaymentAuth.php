@@ -870,7 +870,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 }
             }
 
-            //$this->log('Guest payment token found in URL. Attempting validation.');
+            $this->log(sprintf(
+                'GUEST TOKEN FLOW: Token found in URL (length=%d). WC initialized=%s, cart=%s, session=%s. Request URI: %s',
+                strlen($token),
+                function_exists('WC') ? 'yes' : 'no',
+                (function_exists('WC') && isset(WC()->cart)) ? 'yes' : 'no',
+                (function_exists('WC') && isset(WC()->session)) ? 'yes' : 'no',
+                $_SERVER['REQUEST_URI'] ?? 'unknown'
+            ), 'error');
 
             // Rate Limiting Logic
             $ip_address = $this->get_user_ip_address();
@@ -896,15 +903,20 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             $order = $this->core->validate_token($token);
 
             if ($order instanceof WC_Order) {
-                // Log the found order status
-                //$this->log(
-                //    sprintf('Token validated for Order ID: %d with Status: %s.', $order->get_id(), $order->get_status())
-                //);
+                $this->log(sprintf(
+                    'GUEST TOKEN FLOW: Token validated for Order #%d, status=%s, user_id=%s.',
+                    $order->get_id(),
+                    $order->get_status(),
+                    $order->get_user_id() ?: 'none'
+                ), 'error');
 
                 // Check if token is expired (using core method), passing the existing order object
                 $token_data = $this->core->get_valid_token_data($order->get_id(), $order);
                 if (is_null($token_data)) {
-                    $this->log('Token validation failed: Token data for order #' . $order->get_id() . ' is invalid or expired.');
+                    $this->log(sprintf(
+                        'GUEST TOKEN FLOW: Token expired or invalid for Order #%d. Redirecting to expired.',
+                        $order->get_id()
+                    ), 'error');
 
                     // Increment transient only if rate limiting is active
                     if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
@@ -917,7 +929,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 // User Authentication
                 $user_id = $order->get_user_id();
                 if ($user_id && get_user_by('id', $user_id)) {
-                    //$this->log('Attempting to authenticate user ID: ' . $user_id . ' via token for order #' . $order->get_id() . '.');
+                    $this->log(sprintf(
+                        'GUEST TOKEN FLOW: Authenticating user #%d for order #%d.',
+                        $user_id,
+                        $order->get_id()
+                    ), 'error');
 
                     // Token is for a specific order - use ONLY that order
                     // DO NOT redirect to other unpaid orders
@@ -940,10 +956,11 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     // Ensure no WC session variable is set here for guest state tracking
 
                     $this->log(sprintf(
-                        'GUEST AUTH: User #%d authenticated via token for order #%d. Guest session cookie set.',
+                        'GUEST AUTH: User #%d authenticated via token for order #%d. Guest session cookie set. WC cart initialized=%s.',
                         $user_id,
-                        $order->get_id()
-                    ));
+                        $order->get_id(),
+                        (WC()->cart && WC()->session) ? 'yes' : 'no'
+                    ), 'error');
 
                     // Clear the rate limit transient on success only if rate limiting is active
                     if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
@@ -953,14 +970,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     // Check WC cart state before preparation
                     $cart_items_before = WC()->cart ? count(WC()->cart->get_cart()) : 0;
                     $order_items = $order->get_items() ? count($order->get_items()) : 0;
-                    //$this->log(
-                    //    sprintf(
-                    //        'Before cart preparation: Cart has %d items, Order has %d items (Order ID: %d)',
-                    //        $cart_items_before,
-                    //        $order_items,
-                    //        $order->get_id()
-                    //    )
-                    //);
+                    $this->log(sprintf(
+                        'CART PREP CHECK: Before prepare_cart_from_order — cart_items=%d, order_items=%d, order_id=%d, WC cart=%s, WC session=%s.',
+                        $cart_items_before,
+                        $order_items,
+                        $order->get_id(),
+                        WC()->cart ? 'loaded' : 'NULL',
+                        WC()->session ? 'loaded' : 'NULL'
+                    ), 'error');
 
                     // Ensure WooCommerce is fully initialized
                     if (function_exists('WC') && isset(WC()->cart) && isset(WC()->session)) {
@@ -972,6 +989,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
                     // Prepare the cart with items from the order
                     $cart_prepared = $this->core->prepare_cart_from_order($order);
+
+                    $cart_count_after_prep = WC()->cart ? WC()->cart->get_cart_contents_count() : 0;
+                    $this->log(sprintf(
+                        'CART PREP RESULT: prepare_cart_from_order returned %s for order #%d. Cart items after prep: %d.',
+                        $cart_prepared ? 'TRUE' : 'FALSE',
+                        $order->get_id(),
+                        $cart_count_after_prep
+                    ), 'error');
 
                     // Double-check cart state and force save if needed
                     if ($cart_prepared && WC()->cart && WC()->cart->get_cart_contents_count() > 0) {
@@ -1001,17 +1026,14 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                         // CRITICAL: Save session data
                         WC()->session->save_data();
 
-                        // CRITICAL: Save session data
-                        WC()->session->save_data();
-
-                        //$this->log(
-                        //    sprintf(
-                        //        'After cart preparation: Cart has %d items, Preparation result: %s (Order ID: %d)',
-                        //        WC()->cart->get_cart_contents_count(),
-                        //        ($cart_prepared ? 'SUCCESS' : 'FAILED'),
-                        //        $order->get_id()
-                        //    )
-                        //);
+                        // After calculate_totals, verify cart state is still valid
+                        $cart_count_after_calc = WC()->cart ? WC()->cart->get_cart_contents_count() : 0;
+                        $this->log(sprintf(
+                            'CART PREP POST-CALC: After calculate_totals for order #%d. Cart items: %d (was %d before calc).',
+                            $order->get_id(),
+                            $cart_count_after_calc,
+                            $cart_count_after_prep
+                        ), 'error');
 
                         if ($cart_prepared) {
                             // Double-check cart is not empty before redirecting
@@ -1082,20 +1104,22 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                 }
                             } else {
                                 // Cart is empty despite prepare_cart_from_order returning true
-                                $this->log(
-                                    sprintf('Cart preparation reported success but cart is empty for Order ID: %d', $order->get_id())
-                                );
+                                $this->log(sprintf(
+                                    'CART PREP EMPTY: prepare_cart_from_order returned TRUE but cart is EMPTY after calculate_totals for order #%d. This likely means guard_guest_cart_products or WCS hooks removed all items during calculate_totals().',
+                                    $order->get_id()
+                                ), 'error');
 
                                 $cart_prepared = false; // Force it to go to the error path
                             }
                         } else {
-                            // Cart preparation failed
-                            $this->log(
-                                sprintf('Failed to prepare cart for Order ID: %d after user authentication. Redirecting home.', $order->get_id())
-                            );
+                            // Cart preparation failed — prepare_cart_from_order returned FALSE
+                            $this->log(sprintf(
+                                'CART PREP FAILED (inner): prepare_cart_from_order returned FALSE for order #%d. WC cart=%s, cart_count=%d. Redirecting to cart_prep_failed.',
+                                $order->get_id(),
+                                WC()->cart ? 'loaded' : 'NULL',
+                                WC()->cart ? WC()->cart->get_cart_contents_count() : 0
+                            ), 'error');
 
-                            // If cart prep fails, log out the user we just logged in and redirect home with error
-                            // Use a safer approach to log out that won't trigger WP Cassify session callback issues
                             wp_clear_auth_cookie();
                             setcookie(self::GUEST_SESSION_COOKIE, '', [
                                 'expires' => time() - HOUR_IN_SECONDS,
@@ -1103,24 +1127,22 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                                 'domain' => COOKIE_DOMAIN,
                                 'secure' => is_ssl(),
                                 'httponly' => true,
-                            ]); // Clear cookie
-
-                            // Log the error for debugging
-                            $this->log(
-                                sprintf('Cart preparation failed for Order ID: %d. Using safe logout method.', $order->get_id())
-                            );
+                            ]);
 
                             wp_safe_redirect(home_url('/?guest_payment_error=cart_prep_failed'));
                             $this->maybe_exit();
                         }
                     } else {
-                        // Cart preparation failed
-                        $this->log(
-                            sprintf('Failed to prepare cart for Order ID: %d after user authentication. Redirecting home.', $order->get_id())
-                        );
+                        // Cart preparation failed — either prepare_cart_from_order returned FALSE or cart is empty
+                        $this->log(sprintf(
+                            'CART PREP FAILED (outer): prepare_cart_from_order=%s, cart_count=%d for order #%d. WC cart=%s, WC session=%s. Redirecting to cart_prep_failed.',
+                                $cart_prepared ? 'TRUE' : 'FALSE',
+                            WC()->cart ? WC()->cart->get_cart_contents_count() : 0,
+                            $order->get_id(),
+                            WC()->cart ? 'loaded' : 'NULL',
+                            WC()->session ? 'loaded' : 'NULL'
+                        ), 'error');
 
-                        // If cart prep fails, log out the user we just logged in and redirect home with error
-                        // Use a safer approach to log out that won't trigger WP Cassify session callback issues
                         wp_clear_auth_cookie();
                         setcookie(self::GUEST_SESSION_COOKIE, '', [
                             'expires' => time() - HOUR_IN_SECONDS,
@@ -1128,26 +1150,30 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                             'domain' => COOKIE_DOMAIN,
                             'secure' => is_ssl(),
                             'httponly' => true,
-                        ]); // Clear cookie
-
-                        // Log the error for debugging
-                        $this->log(
-                            sprintf('Cart preparation failed for Order ID: %d. Using safe logout method.', $order->get_id())
-                        );
+                        ]);
 
                         wp_safe_redirect(home_url('/?guest_payment_error=cart_prep_failed'));
                         $this->maybe_exit();
                     }
                 } else {
-                    $this->log(
-                        sprintf('Guest Payment Auth: User authentication failed for User ID: %d, Order ID: %d.', $user_id, $order->get_id())
-                    );
+                    $this->log(sprintf(
+                        'GUEST TOKEN FLOW: User authentication FAILED for order #%d. user_id=%s, user_exists=%s. Redirecting to no_user_id.',
+                        $order->get_id(),
+                        $user_id ?: 'empty',
+                        $user_id ? (get_user_by('id', $user_id) ? 'yes' : 'no') : 'no'
+                    ), 'error');
 
                     // Handle case where user ID is missing (maybe redirect with error?)
                     wp_safe_redirect(home_url('/?guest_payment_error=no_user_id'));
                     $this->maybe_exit();
                 }
             } elseif (is_wp_error($order) || $order === false) {
+                $this->log(sprintf(
+                    'GUEST TOKEN FLOW: Token validation FAILED. Result type=%s, token_length=%d.',
+                    is_wp_error($order) ? 'WP_Error: ' . $order->get_error_message() : 'false',
+                    strlen($token)
+                ), 'error');
+
                 // Increment failed attempts count only if rate limiting is active
                 if (!(defined('WGP_DISABLE_RATE_LIMIT') && WGP_DISABLE_RATE_LIMIT) && $transient_key) {
                     set_transient($transient_key, $failed_attempts + 1, self::FAILED_ATTEMPT_WINDOW_SECONDS);
@@ -1413,7 +1439,7 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 case 'cart_prep_failed':
                     $message = __('Failed to prepare cart for payment. Please try again or contact support.', 'wicket-wgc');
 
-                    $this->log('Displaying error: cart_prep_failed');
+                    $this->log('Displaying error: cart_prep_failed', 'error');
 
                     break;
                 case 'no_user_id':
