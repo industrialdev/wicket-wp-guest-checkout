@@ -8,16 +8,14 @@ source_files: [".github/workflows/release.yml", ".ci/version-bump.php", ".ci/cha
 
 Every merge into `main` bumps this project's version and pushes a matching git tag automatically. The bump runs *after* merge, computed serially from `main`, so a version can never collide with one chosen inside a parallel PR. No one needs push access to `main`, releases are made by a GitHub App (`wicket-release-bot`), not a person.
 
-This is a shared setup used across the Wicket WordPress plugins and theme. The canonical reference lives in [wicket-wp-base-plugin](https://github.com/industrialdev/wicket-wp-base-plugin/blob/main/docs/engineering/release-automation.md).
-
 ---
 
 ## What happens on merge
 
 1. A PR merges into `main` (push event).
-2. `.github/workflows/release.yml` mints a GitHub App token and checks out `main`.
-3. It reads the merge commit message for a bump marker and runs `.ci/version-bump.php`.
-4. It runs `.ci/changelog.php` to prepend a `CHANGELOG.md` section for the new version.
+2. [.github/workflows/release.yml](../../.github/workflows/release.yml) mints a GitHub App token and checks out `main`.
+3. It reads the merge commit message for a bump marker and runs [.ci/version-bump.php](../../.ci/version-bump.php).
+4. It runs [.ci/changelog.php](../../.ci/changelog.php) to prepend a `CHANGELOG.md` section for the new version.
 5. It commits `chore(release): x.y.z`, tags that commit `x.y.z`, and pushes both to `main`.
 
 The workflow ignores its own `chore(release):` commits, so it does not loop. A merge that changes only docs/tooling and should **not** release must include `#norelease` (see below).
@@ -35,7 +33,7 @@ Default is a **patch** bump (`2.4.10` to `2.4.11`). Override with a marker anywh
 
 ## What gets bumped
 
-`.ci/version-bump.php` auto-detects the project's main file and keeps the version in sync across:
+[.ci/version-bump.php](../../.ci/version-bump.php) auto-detects the project's main file and keeps the version in sync across:
 
 - `composer.json` `version` (used as the source of truth when present).
 - The main file header `Version:`, in a plugin's root `*.php` (header `Plugin Name:`) or a theme's `style.css` (header `Theme Name:`).
@@ -55,7 +53,7 @@ It only edits files; it does not commit or tag.
 
 ## Changelog
 
-`CHANGELOG.md` (repo root, [Keep a Changelog](https://keepachangelog.com) style, newest on top) is updated in the same release commit. `.ci/changelog.php` reads the commits merged since the last tag (`git log <last-tag>..HEAD --no-merges`) and prepends one section for the new version.
+`CHANGELOG.md` (repo root, [Keep a Changelog](https://keepachangelog.com) style, newest on top) is updated in the same release commit. [.ci/changelog.php](../../.ci/changelog.php) reads the commits merged since the last tag (`git log <last-tag>..HEAD --no-merges`) and prepends one section for the new version.
 
 Every commit type is included and grouped by its conventional prefix (`feat` to Added, `fix` to Fixed, `perf` to Performance, `refactor` to Changed, `docs` to Documentation, `test` to Tests, `build` to Build, `ci` to CI, `chore`/`style` to Maintenance; anything else to Other). The only commits skipped are the bot's own `chore(release):` commits. A `!` (e.g. `feat!:`) prefixes the line with **BREAKING**.
 
