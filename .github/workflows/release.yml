@@ -1,0 +1,115 @@
+name: Auto version bump & tag
+
+# Bumps the plugin version and pushes a matching git tag whenever a PR is
+# merged into main. Runs AFTER merge, so the version is computed serially from
+# main and can never collide with a version chosen inside a parallel PR.
+#
+# Bump level (default: patch). Override per-release with a marker anywhere in
+# the merge commit message. With GitHub's default squash-merge the PR title
+# becomes that message, so the marker can just go in the PR title:
+#   - "#major" -> X.0.0
+#   - "#minor" -> x.Y.0
+#   - otherwise -> x.y.Z (patch)
+# Include "#norelease" to skip bumping entirely for this merge.
+#
+# Authenticates as a GitHub App (so releases are never tied to a person). The
+# App needs "Contents: Read and write" and must be installed on this repo, with
+# these two secrets available to the repo (set them once at the org level and
+# scope them to the plugin repos):
+#   - RELEASE_APP_ID          the App's numeric App ID
+#   - RELEASE_APP_PRIVATE_KEY the App's generated .pem private key (whole file)
+# The App must also be on the branch-protection / ruleset bypass list for main,
+# otherwise the push below is rejected even with write access.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Skip the workflow's own bump commit to avoid an infinite loop.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    steps:
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Resolve App bot user id
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          USER_ID="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "user-id=$USER_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Determine bump level
+        id: level
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          msg="$COMMIT_MSG"
+          level="patch"
+          if echo "$msg" | grep -qiE '#norelease'; then
+            level="none"
+          elif echo "$msg" | grep -qiE '#major'; then
+            level="major"
+          elif echo "$msg" | grep -qiE '#minor'; then
+            level="minor"
+          fi
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          echo "Resolved bump level: $level"
+
+      - name: Skip if no release requested
+        if: ${{ steps.level.outputs.level == 'none' }}
+        run: echo "::notice::#norelease present; skipping version bump."
+
+      - name: Bump version
+        if: ${{ steps.level.outputs.level != 'none' }}
+        id: bump
+        run: |
+          NEW_VERSION="$(php ./.ci/version-bump.php ${{ steps.level.outputs.level }} | tail -1)"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumped to $NEW_VERSION"
+
+      - name: Generate changelog entry
+        if: ${{ steps.level.outputs.level != 'none' }}
+        run: php ./.ci/changelog.php "${{ steps.bump.outputs.new_version }}"
+
+      - name: Commit, tag & push
+        if: ${{ steps.level.outputs.level != 'none' }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          BOT_USER_ID: ${{ steps.bot.outputs.user-id }}
+        run: |
+          git config user.name  "${APP_SLUG}[bot]"
+          git config user.email "${BOT_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git add composer.json CHANGELOG.md ./*.php
+          git commit -m "chore(release): ${NEW_VERSION}"
+          git tag "${NEW_VERSION}"
+          git push origin HEAD:main
+          git push origin "refs/tags/${NEW_VERSION}"
+          echo "::notice::Released ${NEW_VERSION}"
