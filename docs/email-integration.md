@@ -171,6 +171,4 @@ var_dump(apply_filters('wicket/wooguestpay/email_integration_enabled', false));
 
 ## Related Docs
 
-- [Configuration Quick Reference](../engineering/configuration-quick-reference.md)
 - [Email Template Customization](email-template-customization.md)
-- [PDF Integration Configuration](../engineering/pdf-integration.md)

@@ -1,12 +1,10 @@
-# Wicket Guest Checkout Documentation
+# Documentation Index — wicket-wp-guest-checkout
 
-## Product Docs (Operators & Support)
-- [Guest Checkout Settings](product/guest-checkout-settings.md) — Token expiry, email templates, placeholders
+## Settings Reference (Operators & Support)
 
-## Engineering Docs (Developers & Agents)
-- [Configuration Quick Reference](engineering/configuration-quick-reference.md) — Filters, option keys, constants
-- [PDF Integration](engineering/pdf-integration.md) — Hooks, token expiry, troubleshooting
+- [Guest Checkout Settings](guest-checkout-settings.md) — Token expiry, email templates, placeholders
 
 ## Guides (End Users)
-- [Email Integration](guides/email-integration.md) — How to enable and configure guest payment emails
-- [Email Template Customization](guides/email-template-customization.md) — Placeholders, HTML templates, hook-based customization
+
+- [Email Integration](email-integration.md) — How to enable and configure guest payment emails
+- [Email Template Customization](email-template-customization.md) — Placeholders, HTML templates, hook-based customization

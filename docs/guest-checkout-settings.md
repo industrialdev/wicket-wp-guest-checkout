@@ -84,7 +84,5 @@ Legacy standalone options (`wicket_guest_payment_enable_email_integration`, `wic
 
 ## Documentation Links
 
-- [Email Integration](../guides/email-integration.md) — Enable and configure guest payment emails
-- [Email Template Customization](../guides/email-template-customization.md) — Placeholders, HTML templates, hook-based customization
-- [PDF Integration](../engineering/pdf-integration.md) — Hooks, token expiry, troubleshooting
-- [Configuration Quick Reference](../engineering/configuration-quick-reference.md) — All filters, option keys, constants
+- [Email Integration](./email-integration.md) — Enable and configure guest payment emails
+- [Email Template Customization](./email-template-customization.md) — Placeholders, HTML templates, hook-based customization
