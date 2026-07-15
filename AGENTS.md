@@ -39,72 +39,6 @@ composer setup-hooks                 # Install git pre-push hooks
 WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser
 ```
 
-## Architecture
-
-### Core System Flow
-1. **Token Generation** (Admin) → Encrypted token stored in order meta
-2. **Guest Access** → Token validated → Temporary user authentication created
-3. **Cart Population** → Original order items + prices restored
-4. **Payment** → Processed on existing order (no new order created)
-5. **Cleanup** → Token invalidated, session destroyed, guest logged out
-6. **Receipt** → 30-day access link generated
-
-### Class Responsibilities
-
-**WicketGuestPayment** (Main Coordinator - Singleton)
-- Initializes all components via `plugin_setup()`
-- Manages component lifecycle
-- No business logic - pure orchestration
-
-**WicketGuestPaymentCore** (Token & Cart Management)
-- AES-256-CBC token encryption/decryption
-- HMAC-SHA256 hash validation
-- Cart data preservation and restoration
-- Order meta management
-- Token expiry validation (default: 7 days)
-
-**WicketGuestPaymentAuth** (Authentication & Access Control)
-- Temporary user authentication
-- Session management with validation hash
-- Access restrictions (blocks admin, limits to checkout pages)
-- IP-based rate limiting (5 attempts per 15 minutes)
-- Automatic cleanup after payment
-
-**WicketGuestPaymentAdmin** (Admin Interface)
-- Order meta box UI
-- Manual link generation
-- Email trigger
-- Link invalidation
-- Order notes tracking
-
-**WicketGuestPaymentAdminPay** (Admin Pay For Customer)
-- Admin "Pay For Customer" flow with impersonation
-- Temporary admin session with auto-return
-- 15-minute TTL transients
-- Secure cookie-based authentication
-- Shipping info display on order-pay page
-
-**WicketGuestPaymentConfig** (Configuration Management)
-- Centralized plugin settings
-- Email/PDF integration toggles
-- Token expiry configuration
-- Plugin action links (Settings, Docs)
-- Filter registration
-
-**WicketGuestPaymentEmail** (Notifications)
-- Payment link email delivery
-- Uses WooCommerce email system
-- Filterable subject/content
-
-**WicketGuestPaymentReceipt** (Post-Payment)
-- Receipt access token generation
-- 30-day validity
-- PDF invoice integration hooks
-
-**WicketGuestPaymentInvoice** (PDF Integration)
-- WooCommerce PDF Invoices & Packing Slips integration
-- Receipt page invoice display
-
 ### Data Storage
 
 **Order Meta Keys** (Permanent):
@@ -145,21 +79,6 @@ wgp_admin_pay_{token}                 # AdminPay session (15min TTL)
 - **Type hints**: Required for all method parameters and return types
 - **Autoloading**: PSR-4 via Composer (`Wicket\GuestPayment` namespace)
 
-### File Naming
-```
-class-wicket-guest-payment-*.php      # Classes
-trait-wicket-guest-payment-*.php      # Traits
-abstract-wicket-guest-payment-*.php   # Abstract classes
-```
-
-**Note**: Recent refactor changed to PascalCase filenames without prefix:
-```
-WicketGuestPayment.php
-WicketGuestPaymentCore.php
-AbstractWicketGuestPaymentComponent.php
-TraitWicketGuestPaymentLogger.php
-```
-
 ### Security Requirements
 - **Input**: Sanitize ALL user input
 - **Output**: Escape ALL output (esc_html, esc_attr, esc_url, wp_kses_post)
@@ -172,43 +91,6 @@ TraitWicketGuestPaymentLogger.php
 - Leverage WC_Logger for debugging (logs appear in WooCommerce → Status → Logs)
 - Hook into WooCommerce email system
 - i18n: All strings use 'wicket-wgc' text domain
-
-## Testing Context
-
-### Test Framework
-**Pest PHP** - Modern PHP testing framework (v4+)
-- Syntax: Expectation API with describe/it blocks
-- File naming: `*.pest.php` (e.g., `WicketGuestPaymentCore.pest.php`)
-- Dependencies: Brain Monkey for WordPress function mocking
-- Browser tests: Pest Browser plugin with Playwright
-
-### Test Suites
-1. **Unit Tests** (`tests/unit/*.pest.php`)
-   - Mock WordPress/WooCommerce functions via Brain Monkey
-   - Extend `AbstractTestCase` for common setup
-   - Test individual class methods in isolation
-
-2. **Browser Tests** (`tests/Browser/*.pest.php`)
-   - End-to-end functional tests
-   - Requires running WordPress instance
-   - Uses Playwright for browser automation
-   - Set `WICKET_BROWSER_BASE_URL` environment variable
-
-### Running Tests
-```bash
-# All tests
-./vendor/bin/pest
-
-# Specific suite
-./vendor/bin/pest --testsuite unit
-./vendor/bin/pest --testsuite browser
-
-# Single file
-./vendor/bin/pest tests/unit/WicketGuestPaymentCore.pest.php
-
-# With coverage
-./vendor/bin/pest --coverage-html coverage
-```
 
 ## Critical Security Patterns
 
@@ -272,79 +154,15 @@ add_filter('wicket_guest_payment_email_content', function($content, $order, $tok
 - Allows 'active' status for subscription renewals
 - Filter: `wicket_guest_payment_allowed_subscription_statuses`
 
-## Debugging
+## Release & Branch Workflow
+All work happens on branches. `main` is locked; changes land via peer-reviewed
+Pull Request (devs cross-review each other). Never commit to `main` directly, and never push or open a
+PR without explicit human approval.
 
-### Enable Logging
-Plugin uses WooCommerce logger:
-```php
-$this->log('debug', 'Message', ['context' => 'data']);
-```
-
-View logs: **WooCommerce → Status → Logs → Select "wicket-guest-payment"**
-
-### WordPress Debug Mode
-```php
-// wp-config.php
-define('WP_DEBUG', true);
-define('WP_DEBUG_LOG', true);
-define('WP_DEBUG_DISPLAY', false);
-```
-
-## Constants
-
-```php
-WICKET_GUEST_CHECKOUT_VERSION         # Plugin version
-WICKET_GUEST_CHECKOUT_FILE            # Main plugin file path
-WICKET_GUEST_CHECKOUT_PATH            # Plugin directory path
-WICKET_GUEST_CHECKOUT_URL             # Plugin URL
-WICKET_GUEST_CHECKOUT_BASENAME        # Plugin basename
-WICKET_GUEST_PAYMENT_ENCRYPTION_KEY   # AES-256 encryption key (override in wp-config.php)
-WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD # Encryption method (default: aes-256-cbc)
-```
-
-## Plugin Activation/Deactivation
-
-**Activation** (`wicket_guest_checkout_activate`):
-- Verifies PHP 8.2+ (note: composer.json enforces >=8.3, plugin header says 8.2)
-- Checks WooCommerce active
-- Sets rewrite rules flush flag
-- Records activation timestamp
-
-**Deactivation** (`wicket_guest_checkout_deactivate`):
-- Flushes rewrite rules
-- Removes flags
-- Does NOT delete data (intentional - preserve order history)
-
-## Release Process (Automated)
-
-Releases are **fully automated**. Merging a PR to `main` cuts a release via the `wicket-release-bot` GitHub App: it bumps the version, prepends `CHANGELOG.md`, commits `chore(release): x.y.z`, and pushes the matching git tag. No one needs push access to `main`.
-
-**Never do these by hand:** bump the version, edit `composer.json` / the main file header / `*_VERSION` constants (and `style.css` for the theme), or create git tags. The bot owns all of that after merge.
-
-### Releasing (default behavior)
-
-Every PR merged to `main` releases automatically with a **patch** bump. Control the bump by putting a marker in the **PR title** (squash-merge makes the title the commit message):
-
-| Marker | Result |
-|---|---|
-| _(none)_ | patch (`2.4.10` -> `2.4.11`) |
-| `#minor` | minor (`2.4.10` -> `2.5.0`) |
-| `#major` | major (`2.4.10` -> `3.0.0`) |
-| `#norelease` | no bump, no tag |
-
-### Not releasing
-
-Add `#norelease` to the PR title for docs/tooling-only changes that should not cut a version. **Every merge releases unless the message contains `#norelease`.**
-
-### Commit conventions that affect the changelog
-
-- Use conventional prefixes: `feat:`, `fix:`, `docs:`, `chore:`, `perf:`, `refactor:`, etc. The changelog groups entries by prefix.
-- `feat!:` (or any `!:`) flags a **BREAKING** change in the changelog.
-- **Squash-merge** yields the cleanest changelog (one PR = one line). Merge commits list each individual commit.
-- A release lists **everything merged since the last tag**, not just the triggering PR. Catch-up is expected.
-
-### Local version bump (optional)
-
-`composer version-bump` (or `php .ci/version-bump.php`) edits version files only; it never commits or tags. Use it to preview, not to release.
-
-Full details, markers, and troubleshooting: [`docs/engineering/release-automation.md`](docs/engineering/release-automation.md).
+Merging a PR to `main` **auto-releases** via the `wicket-release-bot` GitHub
+App: version bump, `CHANGELOG.md` update, git tag. Never bump versions or
+create tags by hand. The bump level comes from a marker in the PR title
+(squash-merge makes it the commit message): _(none)_ / `#patch` = patch, `#minor`,
+`#major`, or `#norelease` (no release; use for docs/tooling-only merges).
+Conventional commit prefixes (`feat:`, `fix:`, `docs:`, ...) drive changelog
+grouping; a `!` (e.g. `feat!:`) flags a BREAKING change.
