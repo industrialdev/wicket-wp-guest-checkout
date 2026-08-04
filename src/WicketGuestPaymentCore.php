@@ -353,7 +353,8 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                 //    sprintf('Adding product %d (variation: %d, quantity: %d) to cart for Order ID: %d', $product_id, $variation_id, $quantity, $order->get_id())
                 //);
 
-                // Use a more direct approach to add to cart                $cart_item_data = [];
+                // Use a more direct approach to add to cart
+                $cart_item_data = [];
                 $variation_attributes = [];
 
                 // For subscriptions or other complex products, try to get data from the order item
