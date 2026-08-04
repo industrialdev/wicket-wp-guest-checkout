@@ -174,9 +174,22 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $order_cart_hash = $original_order->get_cart_hash();
 
         if ($current_cart_hash !== $order_cart_hash) {
-            $this->log(sprintf('force_reuse_guest_payment_order: Cart hash mismatch for order #%d. Current: %s, Order: %s. Updating order cart hash.', $original_order_id, $current_cart_hash, $order_cart_hash), 'info');
-            $original_order->set_cart_hash($current_cart_hash);
-            $original_order->save();
+            if ($order_cart_hash === '') {
+                // Empty baseline (common for created_via=admin orders): seed it
+                // from the rebuilt cart so the checkout validator can detect future
+                // changes. This does not mask a divergence because no baseline
+                // existed to diverge from yet.
+                $this->log(sprintf('force_reuse_guest_payment_order: Order #%d had no baseline cart_hash. Seeding with rebuilt cart hash %s.', $original_order_id, $current_cart_hash));
+                $original_order->set_cart_hash($current_cart_hash);
+                $original_order->save();
+            } else {
+                // The cart changed after the baseline was seeded. The checkout
+                // validator (validate_guest_payment_order_before_checkout) should
+                // have blocked this already; reaching here is defensive. Do NOT
+                // overwrite the baseline, that would hide the divergence. Keep
+                // the original hash and let the validator notice control flow.
+                $this->log(sprintf('CART DIVERGENCE: Cart hash mismatch for order #%d. Current: %s, Baseline: %s. NOT overwriting baseline; validator should have blocked.', $original_order_id, $current_cart_hash, $order_cart_hash), 'error');
+            }
         } else {
             $this->log(sprintf('force_reuse_guest_payment_order: Cart hash matches for order #%d: %s', $original_order_id, $current_cart_hash));
         }
@@ -480,6 +493,42 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             );
 
             return;
+        }
+
+        // Fail closed: detect cart divergence from the order this link was
+        // issued for. force_reuse_guest_payment_order reuses the original order,
+        // which skips WC's cart->order sync (set_data_from_cart in
+        // WC_Checkout::create_order). Any change the guest made to the cart (an
+        // added donation, a changed shipping option) would be silently dropped
+        // and the gateway would charge the order's original total. Block instead.
+        $current_cart_hash = (WC()->cart) ? WC()->cart->get_cart_hash() : '';
+        $order_cart_hash = $order->get_cart_hash();
+
+        // Primary signal: a non-empty baseline that no longer matches proves the
+        // cart changed since the link was used. The baseline is seeded on first
+        // reuse, so this only fires on a real change, never on a legitimate
+        // unchanged cart.
+        if ($order_cart_hash !== '' && $current_cart_hash !== $order_cart_hash) {
+            $this->log(sprintf('CART DIVERGENCE: Cart hash mismatch for order #%d. Current: %s, Baseline: %s. Blocking checkout.', $expected_order_id, $current_cart_hash, $order_cart_hash), 'error');
+            wc_add_notice(__('The items in your cart no longer match this payment link. An added donation or a changed shipping option cannot be combined with this order online. Please remove the extra item, or contact us to complete your purchase.', 'wicket-wgc'), 'error');
+
+            return;
+        }
+
+        // Secondary signal (first attempt, before the baseline is seeded): when
+        // the order carries no shipping or fees, the rebuilt cart total must
+        // equal the order total. A higher cart total means the guest added a
+        // chargeable item such as a donation. Orders with shipping or fees are
+        // excluded because prepare_cart_from_order intentionally omits those.
+        if (!count($order->get_shipping_methods()) && !count($order->get_fees())) {
+            $cart_total = (WC()->cart) ? (float) WC()->cart->get_total('edit') : 0.0;
+            $order_total = (float) $order->get_total();
+            if (abs($cart_total - $order_total) > 0.01) {
+                $this->log(sprintf('CART DIVERGENCE: Cart total (%s) differs from order #%d total (%s) on a no-shipping order. Blocking checkout.', $cart_total, $expected_order_id, $order_total), 'error');
+                wc_add_notice(__('The payment amount no longer matches this order. Please use your original payment link to start over, or contact us for help.', 'wicket-wgc'), 'error');
+
+                return;
+            }
         }
 
         // All validations passed
