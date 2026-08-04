@@ -524,15 +524,47 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                         $order->get_id()
                     ), 'error');
                 }
-            } catch (Exception $e) {
-
+            } catch (\Throwable $e) {
+                // A Throwable (PHP Error, not Exception) means the cart is in a broken or
+                // partial state, usually thrown by a third-party hook fired inside
+                // WC()->cart->add_to_cart(). catch(Exception) cannot catch a PHP Error, so the
+                // request previously aborted here and surfaced as the customer-facing
+                // "critical error" screen (logs stopped at "CART PREP ITEM"). Capture the
+                // real thrower, then clear the partial cart so no malformed item persists
+                // into the session and re-fatals the next request on render or cart-sync.
                 $this->log(
-                    sprintf('Error adding product %d to cart for Order ID: %d. Error: %s', $product_id, $order->get_id(), $e->getMessage()),
+                    sprintf(
+                        'CART PREP THROW: product %d, order #%d - %s: %s (in %s:%d). Trace: %s',
+                        $product_id,
+                        $order->get_id(),
+                        get_class($e),
+                        $e->getMessage(),
+                        $e->getFile(),
+                        $e->getLine(),
+                        substr($e->getTraceAsString(), 0, 1000)
+                    ),
                     'error'
                 );
 
-                // Add notice but continue with other products instead of failing completely
+                // A partial cart cannot be paid against a fixed order total, and any item
+                // added earlier in this loop must not survive either: mark nothing added so
+                // the post-loop calculate_totals() is skipped and the caller redirects with
+                // the graceful notice. Clear the cart defensively; empty_cart() fires hooks
+                // that may themselves throw, so guard it and fall back to dropping the
+                // session cart directly.
+                $items_added = false;
+
+                try {
+                    WC()->cart->empty_cart(true);
+                } catch (\Throwable $inner) {
+                    if (isset(WC()->session) && WC()->session) {
+                        WC()->session->set('cart', []);
+                    }
+                    $this->log(sprintf('CART PREP THROW: empty_cart() also threw - %s: %s', get_class($inner), $inner->getMessage()), 'error');
+                }
+
                 wc_add_notice(__('An error occurred while preparing your cart. Please try again or contact support.', 'wicket-wgc'), 'error');
+                break;
             }
         } // End foreach loop
 
