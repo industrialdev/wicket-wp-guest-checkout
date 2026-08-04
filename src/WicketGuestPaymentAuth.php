@@ -1362,11 +1362,26 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 // Check if the new order is valid and belongs to this user
                 $new_order = wc_get_order($order_id);
                 if ($new_order && $new_order->get_user_id() == $current_user_id) {
-                    $this->core->invalidate_token_for_order((int) $original_order_id_to_invalidate);
+                    // Status-gated token invalidation. The session teardown below
+                    // (logout, cookie and user-meta clear) always runs, but the
+                    // token (the link) only dies when the order is actually paid or
+                    // terminally closed. Non-charging gateways (bacs/cheque) land
+                    // the order on-hold here; the guest must be able to return, so
+                    // the token stays valid and handle_payment_completion()
+                    // invalidates it later on the processing/completed transition.
+                    $resumable_statuses = apply_filters('wicket_guest_payment_allowed_order_statuses', ['pending', 'failed', 'on-hold']);
 
-                    //$this->log(
-                    //    sprintf('Order verified cleanup: Invalidated token for original Order ID: %d (New Order ID was %d).', $original_order_id_to_invalidate, $order_id)
-                    //);
+                    if ($new_order->has_status(wc_get_is_paid_statuses())) {
+                        $this->core->invalidate_token_for_order((int) $original_order_id_to_invalidate);
+                    } elseif ($new_order->has_status($resumable_statuses)) {
+                        $new_order->add_order_note(__('Guest checkout used an offline payment method. The payment link stays active until the order is completed or the link expires.', 'wicket-wgc'));
+                        $new_order->save();
+                        $this->log(sprintf('TEARDOWN: Order #%d is in a resumable status (%s). Token kept alive for a return visit; guest logged out.', $order_id, $new_order->get_status()));
+                    } else {
+                        // Cancelled, refunded, trash, or unexpected: revoke defensively.
+                        $this->core->invalidate_token_for_order((int) $original_order_id_to_invalidate);
+                        $this->log(sprintf('TEARDOWN: Order #%d is in a non-resumable status (%s). Token invalidated defensively.', $order_id, $new_order->get_status()), 'warning');
+                    }
                 } else {
                     $this->log(
                         sprintf('DUPLICATE PREVENTION: Skipping cleanup for order #%d - order verification failed for user %d.', $order_id, $current_user_id),
