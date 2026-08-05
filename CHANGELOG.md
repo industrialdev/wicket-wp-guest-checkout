@@ -5,6 +5,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.3.29] - 2026-08-05
+
+### Fixed
+- **guest-payment:** restore cart_item_data init (root cause of fatal)
+- **guest-payment:** catch Throwable in cart prep, clear partial cart
+
+### Documentation
+- add automated release process to AGENTS.md #norelease
+- self-contained release automation reference #norelease
+- add release automation reference #norelease
+
+
 ## [1.3.28] - 2026-07-09
 
 ### Added
