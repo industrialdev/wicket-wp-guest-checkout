@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.3.30] - 2026-08-11
+
+### Fixed
+- **guest-payment:** keep payment link alive for offline methods
+- **guest-payment:** fail closed when guest cart diverges from order
+
+
 ## [1.3.29] - 2026-08-05
 
 ### Fixed
