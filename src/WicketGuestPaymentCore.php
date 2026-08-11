@@ -67,6 +67,11 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         add_action('woocommerce_order_status_processing', [$this, 'handle_payment_completion']);
         add_action('woocommerce_order_status_completed', [$this, 'handle_payment_completion']);
 
+        // Revoke the guest payment token when an order is cancelled or refunded,
+        // so a dead order's link does not ride out the full token TTL.
+        add_action('woocommerce_order_status_cancelled', [$this, 'handle_order_closed']);
+        add_action('woocommerce_order_status_refunded', [$this, 'handle_order_closed']);
+
         // Guard cart contents before other extensions manipulate pricing
         add_action('woocommerce_before_calculate_totals', [$this, 'guard_guest_cart_products'], 1, 1);
         // Ensure custom pricing is applied before totals are calculated
@@ -1453,6 +1458,29 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         ));
 
         $this->invalidate_token_for_order($order_id); // Existing method handles logging success/failure
+    }
+
+    /**
+     * Handles terminal (non-paid) order closures for guest payment tokens.
+     *
+     * Hooked to cancelled and refunded status transitions so a dead order's
+     * payment link is revoked immediately instead of riding out the token TTL.
+     * invalidate_token_for_order is a no-op when no token exists, so this is
+     * safe to run for non-guest orders.
+     *
+     * @param int $order_id The ID of the order.
+     * @return void
+     */
+    public function handle_order_closed(int $order_id): void
+    {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        $this->log(sprintf('ORDER CLOSED: Order #%d (status: %s). Invalidating guest token if present.', $order_id, $order->get_status()));
+
+        $this->invalidate_token_for_order($order_id);
     }
 
     // Encryption/Decryption Helpers
