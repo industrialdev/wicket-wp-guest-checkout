@@ -7,6 +7,8 @@ namespace Wicket\GuestPayment;
 use Exception;
 use WC_Checkout;
 use WC_Order;
+use WC_Order_Item_Product;
+use WC_Product;
 use WP_Error;
 
 /*
@@ -184,11 +186,13 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 $original_order->save();
             } else {
                 // The cart changed after the baseline was seeded. The checkout
-                // validator (validate_guest_payment_order_before_checkout) should
-                // have blocked this already; reaching here is defensive. Do NOT
-                // overwrite the baseline, that would hide the divergence. Keep
-                // the original hash and let the validator notice control flow.
-                $this->log(sprintf('CART DIVERGENCE: Cart hash mismatch for order #%d. Current: %s, Baseline: %s. NOT overwriting baseline; validator should have blocked.', $original_order_id, $current_cart_hash, $order_cart_hash), 'error');
+                // validators now sync guest-added product lines (e.g. a donation)
+                // into simple orders and block shipping/fee drift, so reaching
+                // here means either the sync already ran (simple order: the
+                // donation is on the order, this log is informational) or a path
+                // skipped the validators. Do NOT overwrite the baseline; keep the
+                // original hash and let the validator notice control the outcome.
+                $this->log(sprintf('force_reuse_guest_payment_order: reusing order #%d with a cart-hash delta (Current: %s, Baseline: %s). For simple orders the validator already synced the delta; this is expected, not an error.', $original_order_id, $current_cart_hash, $order_cart_hash));
             }
         } else {
             $this->log(sprintf('force_reuse_guest_payment_order: Cart hash matches for order #%d: %s', $original_order_id, $current_cart_hash));
@@ -495,40 +499,21 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
-        // Fail closed: detect cart divergence from the order this link was
-        // issued for. force_reuse_guest_payment_order reuses the original order,
-        // which skips WC's cart->order sync (set_data_from_cart in
-        // WC_Checkout::create_order). Any change the guest made to the cart (an
-        // added donation, a changed shipping option) would be silently dropped
-        // and the gateway would charge the order's original total. Block instead.
-        $current_cart_hash = (WC()->cart) ? WC()->cart->get_cart_hash() : '';
-        $order_cart_hash = $order->get_cart_hash();
-
-        // Primary signal: a non-empty baseline that no longer matches proves the
-        // cart changed since the link was used. The baseline is seeded on first
-        // reuse, so this only fires on a real change, never on a legitimate
-        // unchanged cart.
-        if ($order_cart_hash !== '' && $current_cart_hash !== $order_cart_hash) {
-            $this->log(sprintf('CART DIVERGENCE: Cart hash mismatch for order #%d. Current: %s, Baseline: %s. Blocking checkout.', $expected_order_id, $current_cart_hash, $order_cart_hash), 'error');
-            wc_add_notice(__('The items in your cart no longer match this payment link. An added donation or a changed shipping option cannot be combined with this order online. Please remove the extra item, or contact us to complete your purchase.', 'wicket-wgc'), 'error');
+        // Reconcile the guest cart with the reused order.
+        //
+        // force_reuse_guest_payment_order returns the original order ID via the
+        // woocommerce_create_order filter, which skips WC's cart->order sync
+        // (set_data_from_cart in WC_Checkout::create_order). Without this step a
+        // guest-added donation would never reach the order and the gateway would
+        // charge the original total. We mirror the cart's PRODUCT surplus into
+        // the order additively (original line items are never mutated), then run
+        // fail-closed nets for anything we do not sync.
+        $sync_block = $this->apply_guest_cart_sync_and_validate($order);
+        if ($sync_block !== null) {
+            $this->log(sprintf('CART DIVERGENCE: %s for order #%d. Blocking checkout.', $sync_block['code'], $expected_order_id), 'error');
+            wc_add_notice($sync_block['message'], 'error');
 
             return;
-        }
-
-        // Secondary signal (first attempt, before the baseline is seeded): when
-        // the order carries no shipping or fees, the rebuilt cart total must
-        // equal the order total. A higher cart total means the guest added a
-        // chargeable item such as a donation. Orders with shipping or fees are
-        // excluded because prepare_cart_from_order intentionally omits those.
-        if (!count($order->get_shipping_methods()) && !count($order->get_fees())) {
-            $cart_total = (WC()->cart) ? (float) WC()->cart->get_total('edit') : 0.0;
-            $order_total = (float) $order->get_total();
-            if (abs($cart_total - $order_total) > 0.01) {
-                $this->log(sprintf('CART DIVERGENCE: Cart total (%s) differs from order #%d total (%s) on a no-shipping order. Blocking checkout.', $cart_total, $expected_order_id, $order_total), 'error');
-                wc_add_notice(__('The payment amount no longer matches this order. Please use your original payment link to start over, or contact us for help.', 'wicket-wgc'), 'error');
-
-                return;
-            }
         }
 
         // All validations passed
@@ -634,14 +619,330 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             return;
         }
 
-        // All validations passed
-        //$this->log(
-        //    sprintf(
-        //        'HARD STOPPER (Block): Validation passed. Order #%d is correct for user %d. Allowing checkout to proceed.',
-        //        $expected_order_id,
-        //        $user_id
-        //    )
-        //);
+        // Reconcile the guest cart with the reused order. Mirrors the classic
+        // validator (see apply_guest_cart_sync_and_validate). Before this, the
+        // Store API path had no divergence guard at all.
+        $sync_block = $this->apply_guest_cart_sync_and_validate($order);
+        if ($sync_block !== null) {
+            $this->log(sprintf('HARD STOPPER (Block) TRIGGERED: %s for order #%d. BLOCKING CHECKOUT.', $sync_block['code'], $order->get_id()), 'error');
+            $validation_errors->add('guest_payment_cart_divergence', $sync_block['message']);
+
+            return;
+        }
+    }
+
+    /**
+     * Sync guest cart changes into the reused order, then run the fail-closed nets.
+     *
+     * The reused order skips WC's cart->order sync (force_reuse_guest_payment_order
+     * returns via the woocommerce_create_order filter), so guest-added product
+     * lines such as a donation would never reach the order. This method mirrors
+     * the cart's PRODUCT surplus into the order additively for simple orders,
+     * then blocks on shipping/fee drift or total drift that it does not sync.
+     *
+     * Original order line items are never mutated; only items tagged
+     * _wgp_synced_from_cart are added or removed to track the cart surplus.
+     *
+     * @param WC_Order $order The reused guest-payment order.
+     * @return array|null Null to allow checkout. ['code'=>string,'message'=>string] to block.
+     */
+    private function apply_guest_cart_sync_and_validate(WC_Order $order): ?array
+    {
+        $cart = WC()->cart;
+        $order_id = $order->get_id();
+
+        // 1) Shipping/fee orders: block BEFORE any mutation. prepare_cart_from_order
+        //    omits shipping/fees from the rebuilt cart, so the product sync and the
+        //    total net are not valid for these orders, and shipping-speed changes
+        //    are not enabled online yet. Any cart-hash drift (a donation, a fee, a
+        //    shipping speed) fails closed without touching the order. An empty
+        //    baseline on a shipping/fee order is itself unexpected and also fails
+        //    closed.
+        if (count($order->get_shipping_methods()) > 0 || count($order->get_fees()) > 0) {
+            $current_hash = $cart ? $cart->get_cart_hash() : '';
+            $baseline_hash = $order->get_cart_hash();
+            if ($baseline_hash === '' || $current_hash !== $baseline_hash) {
+                $this->log(sprintf('CART DIVERGENCE: shipping/fee order #%d cannot be synced online. Current hash: %s, Baseline: %s. Blocking without mutating.', $order_id, $current_hash, $baseline_hash), 'error');
+
+                return [
+                    'code' => 'shipping_fee_drift',
+                    'message' => __('The shipping option or fees for this order could not be updated online. Please remove the added selection, or contact us to complete your purchase.', 'wicket-wgc'),
+                ];
+            }
+
+            return null;
+        }
+
+        // 2) Simple order: mirror guest-added product lines (e.g. a donation) into
+        //    the reused order additively. Returns null on success or an error code
+        //    on an unsupported mutation of an original line.
+        $sync_code = $this->sync_guest_cart_delta_to_order($order);
+        if ($sync_code !== null) {
+            return [
+                'code' => $sync_code,
+                'message' => $this->cart_divergence_message($sync_code),
+            ];
+        }
+
+        // 3) Total net: after the product sync the order total must equal the cart
+        //    total. Catches any charge we did not sync (tax-location drift, a fee).
+        $cart_total = $cart ? (float) $cart->get_total('edit') : 0.0;
+        if (abs($cart_total - (float) $order->get_total()) > 0.01) {
+            $this->log(sprintf('CART DIVERGENCE: order #%d total (%s) differs from cart total (%s) after sync. Blocking.', $order_id, $order->get_total(), $cart_total), 'error');
+
+            return [
+                'code' => 'total_drift',
+                'message' => __('The payment amount for this order could not be updated. Please use your original payment link to start over, or contact us for help.', 'wicket-wgc'),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Mirror guest-added product lines from the cart into the reused order.
+     *
+     * Idempotent: items this method adds are tagged _wgp_synced_from_cart. On a
+     * later call (e.g. a declined-card retry) the diff keys off that tag, so the
+     * same donation is never added twice, and a donation the guest removed is
+     * dropped. Original order lines are never added, removed, or repriced; an
+     * attempt to change an original line fails closed.
+     *
+     * @param WC_Order $order The reused guest-payment order.
+     * @return string|null Null on success (synced or no delta). Error code on unsupported delta.
+     */
+    private function sync_guest_cart_delta_to_order(WC_Order $order): ?string
+    {
+        $cart = WC()->cart;
+        if (!$cart) {
+            return null;
+        }
+
+        $order_id = $order->get_id();
+        $cart_contents = $cart->get_cart();
+        $cart_sig = $this->guest_cart_product_signature($cart_contents);
+
+        // Baseline = the product lines the order was issued with. Seed lazily
+        // from the order's original (non-synced) lines on first validation.
+        $baseline_sig = (string) $order->get_meta('_wgp_product_sig');
+        if ($baseline_sig === '') {
+            $baseline_sig = $this->order_product_signature($order, false);
+            $order->update_meta_data('_wgp_product_sig', $baseline_sig);
+            $order->save();
+            $this->log(sprintf('sync_guest_cart_delta_to_order: seeded product signature baseline for order #%d (%s).', $order_id, $baseline_sig));
+        }
+
+        // No product delta -> nothing to sync.
+        if ($cart_sig === $baseline_sig) {
+            return null;
+        }
+
+        // Index order product lines: originals vs previously-synced guest items.
+        // A duplicate product/variation on the order cannot be told apart and is
+        // not supported online (fail closed).
+        $originals = [];  // 'pid:vid' => WC_Order_Item_Product
+        $synced = [];     // 'pid:vid' => WC_Order_Item_Product
+        foreach ($order->get_items() as $item) {
+            if (!($item instanceof WC_Order_Item_Product)) {
+                continue;
+            }
+            $key = (int) $item->get_product_id() . ':' . (int) $item->get_variation_id();
+            if ($item->get_meta('_wgp_synced_from_cart')) {
+                if (isset($synced[$key])) {
+                    $this->log(sprintf('sync_guest_cart_delta_to_order: duplicate synced product %s on order #%d. Blocking.', $key, $order_id), 'error');
+
+                    return 'duplicate_order_product';
+                }
+                $synced[$key] = $item;
+            } else {
+                if (isset($originals[$key])) {
+                    $this->log(sprintf('sync_guest_cart_delta_to_order: duplicate original product %s on order #%d. Blocking.', $key, $order_id), 'error');
+
+                    return 'duplicate_order_product';
+                }
+                $originals[$key] = $item;
+            }
+        }
+
+        // Index the cart by product/variation id. Two cart lines for the same
+        // product (e.g. the same membership under different orgs, which this
+        // stack produces) cannot be told apart by id alone; fail closed instead
+        // of silently dropping one.
+        $cart_items = [];  // 'pid:vid' => cart item array
+        foreach ($cart_contents as $cart_item) {
+            $pid = (int) ($cart_item['product_id'] ?? 0);
+            $vid = (int) ($cart_item['variation_id'] ?? 0);
+            if (!$pid) {
+                continue;
+            }
+            $key = $pid . ':' . $vid;
+            if (isset($cart_items[$key])) {
+                $this->log(sprintf('sync_guest_cart_delta_to_order: duplicate cart line for product %s on order #%d. Blocking.', $key, $order_id), 'error');
+
+                return 'duplicate_cart_product';
+            }
+            $cart_items[$key] = $cart_item;
+        }
+
+        // --- Phase 1: validate and plan. No mutation. ---
+        // Original lines must still be present and unchanged.
+        foreach ($originals as $key => $item) {
+            if (!isset($cart_items[$key])) {
+                $this->log(sprintf('sync_guest_cart_delta_to_order: original line (product %s) removed from cart for order #%d. Blocking.', $key, $order_id), 'error');
+
+                return 'original_removed';
+            }
+            if ((float) $item->get_quantity() !== (float) ($cart_items[$key]['quantity'] ?? 0)) {
+                $this->log(sprintf('sync_guest_cart_delta_to_order: original line (product %s) quantity changed for order #%d. Blocking.', $key, $order_id), 'error');
+
+                return 'original_qty_change';
+            }
+        }
+
+        // Previously-synced guest items that left the cart must be removed.
+        $removals = [];
+        foreach ($synced as $key => $item) {
+            if (!isset($cart_items[$key])) {
+                $removals[] = (int) $item->get_id();
+            }
+        }
+
+        // Guest-added items must resolve to a real product before we touch anything.
+        $appends = [];  // [WC_Product, qty, subtotal, total]
+        foreach ($cart_items as $key => $cart_item) {
+            if (isset($originals[$key]) || isset($synced[$key])) {
+                continue;
+            }
+            $product = $cart_item['data'] ?? null;
+            if (!($product instanceof WC_Product)) {
+                // Use the variation id when present; product_id is the parent for
+                // variations and would attach the wrong line.
+                $vid = (int) ($cart_item['variation_id'] ?? 0);
+                $pid = (int) ($cart_item['product_id'] ?? 0);
+                $lookup = $vid ?: $pid;
+                $product = $lookup ? wc_get_product($lookup) : null;
+            }
+            $qty = (float) ($cart_item['quantity'] ?? 0);
+            if (!($product instanceof WC_Product) || $qty <= 0) {
+                $this->log(sprintf('sync_guest_cart_delta_to_order: guest-added product %s could not be resolved for order #%d. Blocking.', $key, $order_id), 'error');
+
+                return 'unresolvable_product';
+            }
+            // Use the cart line totals directly so custom-price items (donations)
+            // keep their price even when the product's base price is 0.
+            $line_total = isset($cart_item['line_total']) ? (float) $cart_item['line_total'] : (float) ($product->get_price() * $qty);
+            $line_subtotal = isset($cart_item['line_subtotal']) ? (float) $cart_item['line_subtotal'] : $line_total;
+            $appends[] = [$product, $qty, $line_subtotal, $line_total];
+        }
+
+        // --- Phase 2: apply. Only reached once every check passed. ---
+        $changed = ($removals !== []) || ($appends !== []);
+
+        foreach ($removals as $item_id) {
+            $order->remove_item($item_id);
+        }
+        foreach ($appends as [$product, $qty, $line_subtotal, $line_total]) {
+            $new_item_id = $order->add_product($product, $qty, [
+                'subtotal' => $line_subtotal,
+                'total' => $line_total,
+                'name' => $product->get_name(),
+            ]);
+            if (!$new_item_id) {
+                $this->log(sprintf('sync_guest_cart_delta_to_order: add_product failed for a guest item on order #%d. Blocking.', $order_id), 'error');
+
+                return 'add_failed';
+            }
+            wc_update_order_item_meta($new_item_id, '_wgp_synced_from_cart', current_time('mysql'));
+        }
+
+        // calculate_totals() also recomputes taxes on every line from the order's
+        // stored tax address. Original lines recompute to the same value (same
+        // address); a taxable donation is taxed per its class. This is intended.
+        $order->calculate_totals();
+        // Re-seed the baseline from the ORDER (including synced items), never from
+        // the cart, so a delta that silently failed to apply cannot freeze a lie.
+        // This is a product-only signature; it does not touch the order's WC
+        // cart_hash, so shipping/fee drift stays visible to the caller's net.
+        $order->update_meta_data('_wgp_product_sig', $this->order_product_signature($order, true));
+        $order->save();
+
+        if ($changed) {
+            $this->log(sprintf('sync_guest_cart_delta_to_order: applied guest product delta for order #%d. New total: %s.', $order_id, $order->get_total()));
+        } else {
+            // Signature differed but the plan was empty: a price/meta-only drift
+            // we do not sync. Log it so this class of silent delta is traceable;
+            // the total net in the caller decides whether to block.
+            $this->log(sprintf('sync_guest_cart_delta_to_order: signature delta with an empty plan for order #%d. Deferring to the total net.', $order_id));
+        }
+
+        return null;
+    }
+
+    /**
+     * Guest-facing message for a cart-sync block code.
+     *
+     * Splits guest-fault (an unsupported change to the cart contents) from
+     * server-fault (we could not apply an otherwise valid addition).
+     *
+     * @param string $code Block code returned by sync_guest_cart_delta_to_order.
+     * @return string Localized notice text.
+     */
+    private function cart_divergence_message(string $code): string
+    {
+        $guest_fault = ['original_removed', 'original_qty_change', 'duplicate_order_product', 'duplicate_cart_product'];
+        if (in_array($code, $guest_fault, true)) {
+            return __('We can only add a new item such as a donation to this payment link. Removing or changing an existing item is not supported online. Please contact us to complete your purchase.', 'wicket-wgc');
+        }
+
+        return __('We could not update this order. Please try your payment link again, or contact us to complete your purchase.', 'wicket-wgc');
+    }
+
+    /**
+     * Product-only signature for an order's line items.
+     *
+     * @param WC_Order $order          The order to read line items from.
+     * @param bool     $include_synced Include _wgp_synced_from_cart items.
+     * @return string md5 signature.
+     */
+    private function order_product_signature(WC_Order $order, bool $include_synced): string
+    {
+        $rows = [];
+        foreach ($order->get_items() as $item) {
+            if (!($item instanceof WC_Order_Item_Product)) {
+                continue;
+            }
+            if (!$include_synced && $item->get_meta('_wgp_synced_from_cart')) {
+                continue;
+            }
+            $qty = (float) $item->get_quantity();
+            $unit = $qty > 0 ? (float) $item->get_total() / $qty : 0.0;
+            $rows[] = [(int) $item->get_product_id(), (int) $item->get_variation_id(), $qty, round($unit, 4)];
+        }
+        usort($rows, static fn ($a, $b) => $a <=> $b);
+
+        return md5((string) json_encode($rows));
+    }
+
+    /**
+     * Product-only signature for the current cart contents.
+     *
+     * @param array $cart_contents Result of WC()->cart->get_cart().
+     * @return string md5 signature.
+     */
+    private function guest_cart_product_signature(array $cart_contents): string
+    {
+        $rows = [];
+        foreach ($cart_contents as $cart_item) {
+            $pid = (int) ($cart_item['product_id'] ?? 0);
+            $vid = (int) ($cart_item['variation_id'] ?? 0);
+            $qty = (float) ($cart_item['quantity'] ?? 0);
+            $line_total = isset($cart_item['line_total']) ? (float) $cart_item['line_total'] : 0.0;
+            $unit = $qty > 0 ? $line_total / $qty : 0.0;
+            $rows[] = [$pid, $vid, $qty, round($unit, 4)];
+        }
+        usort($rows, static fn ($a, $b) => $a <=> $b);
+
+        return md5((string) json_encode($rows));
     }
 
     /**
