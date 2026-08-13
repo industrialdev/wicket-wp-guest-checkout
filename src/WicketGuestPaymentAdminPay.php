@@ -43,7 +43,6 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     {
         add_action('admin_post_wicket_admin_pay', [$this, 'handle_admin_pay_request']);
         add_action('admin_post_wicket_admin_pay_return', [$this, 'handle_admin_pay_return']);
-        add_action('admin_post_nopriv_wicket_admin_pay_return', [$this, 'handle_admin_pay_return']);
         add_action('template_redirect', [$this, 'maybe_start_admin_pay_session'], 5);
         add_action('template_redirect', [$this, 'maybe_auto_return_admin'], 6);
         add_action('wp_footer', [$this, 'render_admin_pay_return_button']);
@@ -172,12 +171,6 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $expires = time() + self::ADMIN_PAY_TTL;
         $this->set_admin_pay_cookie(self::ADMIN_PAY_COOKIE_TOKEN, $token, $expires);
         $this->set_admin_pay_cookie(self::ADMIN_PAY_COOKIE_SECRET, $return_secret, $expires);
-
-        $session_key = 'wgp_admin_pay_session_' . $customer_id;
-        set_transient($session_key, [
-            'token' => $token,
-            'secret' => $return_secret,
-        ], self::ADMIN_PAY_TTL);
 
         wp_clear_auth_cookie();
         wp_set_current_user($customer_id);
@@ -534,16 +527,11 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     {
         $nonce = isset($_REQUEST['_wpnonce']) ? sanitize_text_field(wp_unslash($_REQUEST['_wpnonce'])) : '';
         $nonce_valid = $nonce ? wp_verify_nonce($nonce, 'wicket_admin_pay_return') : false;
-
-        $data = $this->get_active_admin_pay_session();
-        if (!$nonce_valid && !$data) {
+        if (!$nonce_valid) {
             wp_die(esc_html__('Security check failed or session expired.', 'wicket-wgc'));
         }
 
-        if (!$data) {
-            $data = $this->get_active_admin_pay_session();
-        }
-
+        $data = $this->get_active_admin_pay_session();
         if (!$data) {
             wp_die(esc_html__('Admin pay session expired or invalid.', 'wicket-wgc'));
         }
@@ -558,8 +546,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
             wp_die(esc_html__('Admin pay session data incomplete.', 'wicket-wgc'));
         }
 
-        $current_user_id = get_current_user_id();
-        if ($current_user_id && ($current_user_id !== $customer_id && $current_user_id !== $admin_id)) {
+        if (get_current_user_id() !== $customer_id) {
             wp_die(esc_html__('You do not have permission to return.', 'wicket-wgc'));
         }
 
@@ -632,12 +619,6 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
         $expire = time() - HOUR_IN_SECONDS;
         setcookie(self::ADMIN_PAY_COOKIE_TOKEN, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
         setcookie(self::ADMIN_PAY_COOKIE_SECRET, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
-
-        $customer_id = get_current_user_id();
-        if ($customer_id) {
-            $session_key = 'wgp_admin_pay_session_' . $customer_id;
-            delete_transient($session_key);
-        }
     }
 
     private function get_order_edit_url(int $order_id): string
@@ -701,17 +682,7 @@ class WicketGuestPaymentAdminPay extends WicketGuestPaymentComponent
     {
         $token = $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_TOKEN);
         $secret = $this->get_admin_pay_cookie(self::ADMIN_PAY_COOKIE_SECRET);
-        if (!$token || !$secret) {
-            $customer_id = get_current_user_id();
-            if ($customer_id) {
-                $session_key = 'wgp_admin_pay_session_' . $customer_id;
-                $session_data = get_transient($session_key);
-                if (is_array($session_data)) {
-                    $token = (string) ($session_data['token'] ?? '');
-                    $secret = (string) ($session_data['secret'] ?? '');
-                }
-            }
-        }
+        // The cookie pair is the sole credential. Missing cookies means no session.
         if (!$token || !$secret) {
             return null;
         }
