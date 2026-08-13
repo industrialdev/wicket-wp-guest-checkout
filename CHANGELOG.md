@@ -5,6 +5,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.3.31] - 2026-08-13
+
+### Fixed
+- **security:** close admin-pay session escalation (F-04)
+
+
 ## [1.3.30] - 2026-08-11
 
 ### Fixed
