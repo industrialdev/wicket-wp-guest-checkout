@@ -670,13 +670,26 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 ];
             }
 
+            $this->log(sprintf('CART SYNC: allowing shipping/fee order #%d unchanged (cart hash matches baseline). Order total: %s.', $order_id, $order->get_total()));
+
             return null;
         }
 
         // 2) Simple order: mirror guest-added product lines (e.g. a donation) into
         //    the reused order additively. Returns null on success or an error code
-        //    on an unsupported mutation of an original line.
-        $sync_code = $this->sync_guest_cart_delta_to_order($order);
+        //    on an unsupported mutation of an original line. Wrapped so an
+        //    unexpected throw (DB/HPOS) fails closed instead of leaving a half
+        //    synced order and a fatal checkout.
+        try {
+            $sync_code = $this->sync_guest_cart_delta_to_order($order);
+        } catch (\Throwable $e) {
+            $this->log(sprintf('CART DIVERGENCE: sync threw %s for order #%d: %s', get_class($e), $order_id, $e->getMessage()), 'error');
+
+            return [
+                'code' => 'sync_exception',
+                'message' => __('We could not update this order. Please try your payment link again, or contact us to complete your purchase.', 'wicket-wgc'),
+            ];
+        }
         if ($sync_code !== null) {
             return [
                 'code' => $sync_code,
@@ -695,6 +708,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                 'message' => __('The payment amount for this order could not be updated. Please use your original payment link to start over, or contact us for help.', 'wicket-wgc'),
             ];
         }
+
+        $this->log(sprintf('CART SYNC: allowing checkout for order #%d. Order total: %s, cart total: %s.', $order_id, $order->get_total(), $cart ? $cart->get_total('edit') : 'null'));
 
         return null;
     }
@@ -895,6 +910,45 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         }
 
         return __('We could not update this order. Please try your payment link again, or contact us to complete your purchase.', 'wicket-wgc');
+    }
+
+    /**
+     * Defensive end-to-end log at guest-payment completion.
+     *
+     * Records the order's final composition (total, status, payment method, and
+     * the count + sum of guest-added, synced items) so an order/gateway mismatch
+     * is traceable later. Wrapped so a logging failure can never break teardown.
+     *
+     * @param int $order_id The order that was just paid.
+     * @return void
+     */
+    private function log_guest_payment_completion(int $order_id): void
+    {
+        try {
+            $order = wc_get_order($order_id);
+            if (!($order instanceof WC_Order)) {
+                return;
+            }
+            $synced_count = 0;
+            $synced_total = 0.0;
+            foreach ($order->get_items() as $item) {
+                if ($item instanceof WC_Order_Item_Product && $item->get_meta('_wgp_synced_from_cart')) {
+                    ++$synced_count;
+                    $synced_total += (float) $item->get_total();
+                }
+            }
+            $this->log(sprintf(
+                'GUEST PAYMENT COMPLETED: order #%d, status %s, total %s, payment method %s. Guest-added (synced) items: %d totaling %s.',
+                $order_id,
+                $order->get_status(),
+                $order->get_total(),
+                $order->get_payment_method(),
+                $synced_count,
+                $synced_total
+            ));
+        } catch (\Throwable $e) {
+            $this->log(sprintf('log_guest_payment_completion: failed for order #%d: %s', $order_id, $e->getMessage()), 'warning');
+        }
     }
 
     /**
@@ -1651,6 +1705,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $has_meta   = $user_id ? !empty(get_user_meta($user_id, '_wgp_guest_session_token_validation', true)) : false;
 
         if ($has_cookie || $has_meta) {
+            // Defensive: record the order's final composition so an order/gateway
+            // mismatch is traceable later. Wrapped, so it can never break teardown.
+            $this->log_guest_payment_completion($order_id);
+
             // Ensure no session variable is checked or cleared here
 
             // The $order_id passed here is for the NEW order just created by the checkout.
