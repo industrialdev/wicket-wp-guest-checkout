@@ -5,6 +5,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.3.32] - 2026-08-14
+
+### Fixed
+- preserve manual line-item discounts in guest checkout cart rebuild
+
+
 ## [1.3.31] - 2026-08-13
 
 ### Fixed
