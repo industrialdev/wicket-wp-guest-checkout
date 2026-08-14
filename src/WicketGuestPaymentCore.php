@@ -376,12 +376,20 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
                     $variation_attributes = $item->get_variation_attributes();
                 }
 
-                // Store custom price for 0/blank price products
+                // Store custom price whenever the order item's actual per-unit price
+                // (e.g. after a manual line-item discount) differs from the live product
+                // price. Without this, calculate_totals() repriced the line from the
+                // product's current price and silently dropped the discount.
                 $product_price = $product->get_price();
                 $order_quantity = (int) $item->get_quantity();
                 $normalized_quantity = $order_quantity > 0 ? $order_quantity : 1;
-                if ($product_price === '' || (float) $product_price === 0.0) {
-                    $cart_item_data['custom_price'] = (float) $item->get_total() / $normalized_quantity;
+                $order_item_unit_price = (float) $item->get_total() / $normalized_quantity;
+                if (
+                    $product_price === ''
+                    || (float) $product_price === 0.0
+                    || abs((float) $product_price - $order_item_unit_price) > 0.0001
+                ) {
+                    $cart_item_data['custom_price'] = $order_item_unit_price;
                 }
 
                 // Get the cart item key to verify addition was successful
