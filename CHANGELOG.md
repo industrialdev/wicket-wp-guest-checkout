@@ -5,6 +5,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.3.33] - 2026-08-17
+
+### Fixed
+- **guest-payment:** add defensive logging around cart sync
+- **guest-payment:** sync guest-added cart items into reused order
+
+
 ## [1.3.32] - 2026-08-14
 
 ### Fixed
