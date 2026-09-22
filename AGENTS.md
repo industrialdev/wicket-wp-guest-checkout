@@ -97,13 +97,12 @@ WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser
 - Filterable subject/content
 
 **WicketGuestPaymentReceipt** (Post-Payment)
-- Receipt access token generation
+- Receipt access token generation (all guest payment orders, no email required)
 - 30-day validity
-- PDF invoice integration hooks
+- Token-gated printable receipt page (templates shipped in `templates/`)
 
 **WicketGuestPaymentInvoice** (PDF Integration)
-- WooCommerce PDF Invoices & Packing Slips integration
-- Receipt page invoice display
+- WooCommerce PDF Invoices & Packing Slips integration for payment link emails/PDFs
 
 ### Data Storage
 
