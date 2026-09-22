@@ -360,14 +360,17 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             return;
         }
 
-        $receipt_token = $this->get_or_generate_receipt_token($order);
-
-        $receipt_url = ('' !== $receipt_token) ? home_url("/guest-receipt/{$receipt_token}/") : '';
-
         $show_print = (bool) apply_filters('wicket/wooguestpay/receipt_print_enabled', true);
         $show_email = (bool) apply_filters('wicket/wooguestpay/receipt_email_enabled', true);
 
-        if ($show_print && '' !== $receipt_url) {
+        if (!$show_print && !$show_email) {
+            return;
+        }
+
+        $receipt_token = $show_print ? $this->get_or_generate_receipt_token($order) : null;
+        $receipt_url = (null !== $receipt_token) ? home_url("/guest-receipt/{$receipt_token}/") : '';
+
+        if ('' !== $receipt_url) {
             $template = $this->resolve_template('guest-receipt-thankyou-section.php');
 
             if ($template) {
@@ -403,7 +406,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             </p>
             <form id="wicket-guest-email-form" data-order-id="<?php echo esc_attr((string) $order_id); ?>">
                 <input type="hidden" name="order_id" value="<?php echo esc_attr((string) $order_id); ?>">
-                <input type="hidden" name="nonce" value="<?php echo esc_attr($hash); ?>">
+                <input type="hidden" name="auth_hash" value="<?php echo esc_attr($hash); ?>">
                 <input type="email" name="email" required placeholder="you@example.com"
                        style="padding: 10px 14px; border: 1px solid #ccc; border-radius: 4px; min-width: 260px;">
                 <button type="submit"
@@ -423,7 +426,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
                 $.post('<?php echo esc_js($ajax_url); ?>', {
                     action: 'wicket_set_guest_email_and_send_receipt',
                     order_id: $form.find('input[name="order_id"]').val(),
-                    nonce: $form.find('input[name="nonce"]').val(),
+                    auth_hash: $form.find('input[name="auth_hash"]').val(),
                     email: $form.find('input[name="email"]').val()
                 }).done(function (response) {
                     var ok = response && response.success;
@@ -453,9 +456,9 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition.
         // This token depends only on the Order ID and the site's Nonce Salt, making it stable across the logout boundary.
         $expected_hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
-        $received_nonce = (string) ($_POST['nonce'] ?? '');
+        $received_hash = (string) ($_POST['auth_hash'] ?? '');
 
-        if (!hash_equals($expected_hash, $received_nonce)) {
+        if (!hash_equals($expected_hash, $received_hash)) {
             $this->log(sprintf('Security token verification failed. Order ID: %d', $order_id));
             wp_send_json_error(['message' => __('Security check failed. Please reload the page.', 'wicket-wgc')], 403);
         }
