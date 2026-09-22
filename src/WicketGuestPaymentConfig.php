@@ -40,6 +40,8 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     private const OPTION_WICKET_ADMIN_PAY_ENABLED = 'wicket_admin_settings_guest_payment_enable_admin_pay';
     private const OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE = 'wicket_admin_settings_guest_payment_email_subject_template';
     private const OPTION_WICKET_EMAIL_BODY_TEMPLATE = 'wicket_admin_settings_guest_payment_email_body_template';
+    private const OPTION_WICKET_RECEIPT_PRINT_ENABLED = 'wicket_admin_settings_guest_payment_receipt_print_enabled';
+    private const OPTION_WICKET_RECEIPT_EMAIL_ENABLED = 'wicket_admin_settings_guest_payment_receipt_email_enabled';
 
     /**
      * Initialize configuration hooks and filters.
@@ -72,6 +74,10 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
 
         // Admin pay flow configuration
         add_filter('wicket/wooguestpay/admin_pay_enabled', [$this, 'filter_admin_pay_enabled'], 10, 1);
+
+        // Receipt display configuration
+        add_filter('wicket/wooguestpay/receipt_print_enabled', [$this, 'filter_receipt_print_enabled'], 10, 1);
+        add_filter('wicket/wooguestpay/receipt_email_enabled', [$this, 'filter_receipt_email_enabled'], 10, 1);
     }
 
     /**
@@ -212,6 +218,40 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
 
         // Return default (enabled by default)
         return true;
+    }
+
+    /**
+     * Filter for print receipt button visibility on the thank you page.
+     *
+     * @param bool $default_enabled Default enabled status.
+     * @return bool Filtered enabled status.
+     */
+    public function filter_receipt_print_enabled(bool $default_enabled): bool
+    {
+        // Absent means never configured: fall through to the default.
+        $value = $this->get_wicket_option(self::OPTION_WICKET_RECEIPT_PRINT_ENABLED, null);
+        if (null !== $value) {
+            return $this->coerce_to_bool($value);
+        }
+
+        return $default_enabled;
+    }
+
+    /**
+     * Filter for receipt email capture visibility on the thank you page.
+     *
+     * @param bool $default_enabled Default enabled status.
+     * @return bool Filtered enabled status.
+     */
+    public function filter_receipt_email_enabled(bool $default_enabled): bool
+    {
+        // Absent means never configured: fall through to the default.
+        $value = $this->get_wicket_option(self::OPTION_WICKET_RECEIPT_EMAIL_ENABLED, null);
+        if (null !== $value) {
+            return $this->coerce_to_bool($value);
+        }
+
+        return $default_enabled;
     }
 
     /**
@@ -405,6 +445,20 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             'default' => true,
         ]);
 
+        $section->add_option('checkbox', [
+            'name' => self::OPTION_WICKET_RECEIPT_PRINT_ENABLED,
+            'label' => __('Show Print Receipt button on the Thank You page', 'wicket-wgc'),
+            'description' => __('Display a Print Receipt button for guest payers on the order confirmation page. It opens a token-gated receipt page that can be printed or saved as PDF.', 'wicket-wgc'),
+            'default' => true,
+        ]);
+
+        $section->add_option('checkbox', [
+            'name' => self::OPTION_WICKET_RECEIPT_EMAIL_ENABLED,
+            'label' => __('Show receipt email capture on the Thank You page', 'wicket-wgc'),
+            'description' => __('Display the "Receive Your Payment Receipt" form so guest payers can email themselves the receipt link.', 'wicket-wgc'),
+            'default' => true,
+        ]);
+
         $section->add_option('text', [
             'name' => self::OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE,
             'label' => __('Email Subject Template', 'wicket-wgc'),
@@ -562,6 +616,8 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             'pdf_integration_enabled' => $this->filter_pdf_integration_enabled(false),
             'admin_pay_enabled' => $this->filter_admin_pay_enabled(true),
             'token_expiry_days' => $this->filter_token_expiry_days(7),
+            'receipt_print_enabled' => $this->filter_receipt_print_enabled(true),
+            'receipt_email_enabled' => $this->filter_receipt_email_enabled(true),
             'email_subject_template' => (string) get_option(
                 self::OPTION_EMAIL_SUBJECT_TEMPLATE,
                 (string) $this->get_wicket_option(
@@ -724,6 +780,18 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 'description' => __('Allow staff to open the admin-assisted checkout flow and enter payment details on behalf of customers.', 'wicket-wgc'),
                 'enabled' => $this->filter_admin_pay_enabled(true),
                 'option' => self::OPTION_WICKET_ADMIN_PAY_ENABLED,
+            ],
+            'receipt_print_enabled' => [
+                'label' => __('Print Receipt Button', 'wicket-wgc'),
+                'description' => __('Show a Print Receipt button on the thank you page for guest payers', 'wicket-wgc'),
+                'enabled' => $this->filter_receipt_print_enabled(true),
+                'option' => self::OPTION_WICKET_RECEIPT_PRINT_ENABLED,
+            ],
+            'receipt_email_enabled' => [
+                'label' => __('Receipt Email Capture', 'wicket-wgc'),
+                'description' => __('Show the receipt email capture form on the thank you page for guest payers', 'wicket-wgc'),
+                'enabled' => $this->filter_receipt_email_enabled(true),
+                'option' => self::OPTION_WICKET_RECEIPT_EMAIL_ENABLED,
             ],
             'email_subject_template' => [
                 'label' => __('Email Subject Template', 'wicket-wgc'),

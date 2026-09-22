@@ -100,6 +100,7 @@ WICKET_BROWSER_BASE_URL=https://localhost ./vendor/bin/pest --testsuite browser
 - Receipt access token generation (all guest payment orders, no email required)
 - 30-day validity
 - Token-gated printable receipt page (templates shipped in `templates/`)
+- Thank-you page display toggles (both default on, per-site in Wicket Settings > Integrations > Guest Checkout): Print Receipt button (`wicket/wooguestpay/receipt_print_enabled`) and email capture form (`wicket/wooguestpay/receipt_email_enabled`)
 
 **WicketGuestPaymentInvoice** (PDF Integration)
 - WooCommerce PDF Invoices & Packing Slips integration for payment link emails/PDFs
