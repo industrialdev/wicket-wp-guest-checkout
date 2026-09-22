@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Wicket\GuestPayment;
 
 use Exception;
+use WC_DateTime;
 use WC_Order;
 
 /*
@@ -30,6 +31,16 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
      * @var int
      */
     private int $receipt_token_expiry_days = 30;
+
+    /**
+     * Email capture form validity in days (about 6 months from order creation).
+     *
+     * The form hash is deterministic (order ID + salt), so it is bounded by
+     * an explicit time window instead of a rotating nonce.
+     *
+     * @var int
+     */
+    private int $email_capture_validity_days = 182;
 
     /**
      * Constructor.
@@ -381,19 +392,40 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         }
 
         if ($show_email) {
-            $this->render_email_capture_form($order_id);
+            $this->render_email_capture_form($order);
         }
+    }
+
+    /**
+     * Gets the expiry timestamp for the email capture form of an order.
+     *
+     * The form hash is deterministic, so the window is bounded explicitly:
+     * after this point the AJAX handler rejects the form even with a valid hash.
+     *
+     * @param WC_Order $order The order object.
+     * @return int|null Absolute expiry timestamp, or null when the order has no creation date (fail closed).
+     */
+    private function get_email_capture_expiry(WC_Order $order): ?int
+    {
+        $created = $order->get_date_created();
+        if (!$created instanceof WC_DateTime) {
+            return null;
+        }
+
+        return $created->getTimestamp() + ($this->email_capture_validity_days * DAY_IN_SECONDS);
     }
 
     /**
      * Renders the email capture form for the thank you page.
      *
-     * @param int $order_id The order ID.
+     * @param WC_Order $order The order object.
      * @return void
      */
-    private function render_email_capture_form(int $order_id): void
+    private function render_email_capture_form(WC_Order $order): void
     {
+        $order_id = $order->get_id();
         // Deterministic hash so the form survives the logout transition right after payment.
+        // The handler bounds its lifetime to email_capture_validity_days from order creation.
         $hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
         $ajax_url = admin_url('admin-ajax.php');
         ?>
@@ -479,6 +511,13 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         $order = wc_get_order($order_id);
         if (!$order instanceof WC_Order) {
             wp_send_json_error(['message' => __('Order not found.', 'wicket-wgc')]);
+        }
+
+        // The form hash is deterministic, so its usable window is bounded by order age.
+        $expires_at = $this->get_email_capture_expiry($order);
+        if (null === $expires_at || time() > $expires_at) {
+            $this->log(sprintf('Email capture window expired for Order ID: %d', $order_id));
+            wp_send_json_error(['message' => __('This receipt form has expired. Please contact support.', 'wicket-wgc')], 410);
         }
 
         // Record the payer's email on the order for reference and admin displays.
