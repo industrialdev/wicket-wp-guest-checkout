@@ -5,6 +5,21 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.4.0] - 2026-09-24
+
+### Added
+- **receipt:** add per-site receipt display options (email/print)
+- **receipt:** replace email receipt flow with print receipt page
+
+### Fixed
+- **receipt:** render deleted-product lines and block double submit
+- **receipt:** expire email capture hash after 6 months
+- **receipt:** harden token handling after peer review
+
+### Documentation
+- add PR description template #norelease
+
+
 ## [1.3.33] - 2026-08-17
 
 ### Fixed
