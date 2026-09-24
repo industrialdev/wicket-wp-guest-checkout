@@ -888,8 +888,26 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             break;
         }
 
+        // Packages are per-request and may be empty during checkout
+        // validation even when the cart is carrying shipping. Fall back to
+        // the cart's own shipping total: the guard compares money, so the
+        // mirror must equal what the cart charges, not a re-quoted rate.
         if (!$rate instanceof WC_Shipping_Rate) {
-            return null;
+            $cart = WC()->cart;
+            if (!$cart || (float) $cart->get_shipping_total() <= 0.0) {
+                return null;
+            }
+
+            $item = new WC_Order_Item_Shipping();
+            $item->set_props([
+                'method_title' => WC()->session ? (string) reset($chosen) : '',
+                'method_id' => 'other',
+                'instance_id' => 0,
+                'total' => (float) $cart->get_shipping_total(),
+                'taxes' => [],
+            ]);
+
+            return $item;
         }
 
         $item = new WC_Order_Item_Shipping();
