@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Wicket\GuestPayment;
 
 use Exception;
+use WC_DateTime;
 use WC_Order;
 
 /*
  * Guest Subscription Payment Flow for WooCommerce - Receipt Management.
  *
- * Handles receipt access and delivery for guest payers after payment completion.
+ * Handles receipt access for guest payers after payment completion.
+ * The receipt page is token-gated and printable. The thank you page can
+ * show a Print Receipt button and an email capture form, both controlled
+ * by the site's Guest Checkout settings.
  */
 
 // No direct access
@@ -27,6 +31,16 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
      * @var int
      */
     private int $receipt_token_expiry_days = 30;
+
+    /**
+     * Email capture form validity in days (about 6 months from order creation).
+     *
+     * The form hash is deterministic (order ID + salt), so it is bounded by
+     * an explicit time window instead of a rotating nonce.
+     *
+     * @var int
+     */
+    private int $email_capture_validity_days = 182;
 
     /**
      * Constructor.
@@ -52,16 +66,13 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
         add_action('woocommerce_order_status_processing', [$this, 'generate_receipt_access_token']);
         add_action('woocommerce_order_status_completed', [$this, 'generate_receipt_access_token']);
 
-        // Add AJAX handler for email receipt delivery (via management interface - authenticated only)
-        add_action('wp_ajax_wicket_send_guest_receipt', [$this, 'ajax_send_receipt_email']);
-
-        // Add AJAX handler for email capture on Thank You page
-        add_action('wp_ajax_wicket_set_guest_email_and_send_receipt', [$this, 'ajax_set_guest_email_and_send_receipt']);
-        add_action('wp_ajax_nopriv_wicket_set_guest_email_and_send_receipt', [$this, 'ajax_set_guest_email_and_send_receipt']);
-
         // Add post-payment receipt access section
         // Use woocommerce_order_details_after_order_table because it runs even for guest users who are logged out
         add_action('woocommerce_order_details_after_order_table', [$this, 'add_receipt_access_section'], 20);
+
+        // Receipt email capture (AJAX, works for logged-out guests)
+        add_action('wp_ajax_wicket_set_guest_email_and_send_receipt', [$this, 'ajax_set_guest_email_and_send_receipt']);
+        add_action('wp_ajax_nopriv_wicket_set_guest_email_and_send_receipt', [$this, 'ajax_set_guest_email_and_send_receipt']);
     }
 
     /**
@@ -99,7 +110,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             return;
         }
 
-        $token = sanitize_text_field(get_query_var('guest_payment_token'));
+        $token = sanitize_text_field((string) get_query_var('guest_payment_token'));
         $order = $this->validate_receipt_token($token);
 
         if (!$order instanceof WC_Order) {
@@ -112,7 +123,22 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
     }
 
     /**
-     * Generates a receipt access token for completed orders.
+     * Checks whether an order was placed through the guest payment flow.
+     *
+     * The token hash is removed after payment, so completed orders are also
+     * detected through the guest user id left behind by session cleanup.
+     *
+     * @param WC_Order $order The order object.
+     * @return bool True when the order is a guest payment order.
+     */
+    private function is_guest_payment_order(WC_Order $order): bool
+    {
+        return !empty($order->get_meta('_wgp_guest_payment_token_hash', true))
+            || !empty($order->get_meta('_wgp_guest_payment_user_id', true));
+    }
+
+    /**
+     * Generates a receipt access token for completed guest payment orders.
      *
      * @param int $order_id The order ID.
      * @return void
@@ -124,36 +150,45 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             return;
         }
 
-        // Check if this was a guest payment order
-        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
-        if (empty($guest_email)) {
-            // If it's a guest order but has no email (manual link), skip generation
-            if ($order->get_meta('_wgp_guest_payment_token_hash', true)) {
-                $this->log(sprintf('Skipping receipt token generation for Order ID %d: No guest email associated yet.', $order_id));
-            }
+        if (!$this->is_guest_payment_order($order)) {
+            $this->log(sprintf('Skipping receipt token generation for Order ID %d: Not a guest payment order.', $order_id));
 
             return;
         }
 
-        // Check if receipt token already exists
-        $existing_token = $order->get_meta('_wgp_receipt_access_token', true);
-        if ($existing_token) {
-            // Check if existing token is still valid
+        $this->get_or_generate_receipt_token($order);
+    }
+
+    /**
+     * Gets a valid receipt access token for an order, generating one when missing or expired.
+     *
+     * @param WC_Order $order The order object.
+     * @return string|null The receipt token, or null on failure.
+     */
+    private function get_or_generate_receipt_token(WC_Order $order): ?string
+    {
+        $order_id = $order->get_id();
+
+        // Reuse the existing token while it is still valid
+        $existing_token = (string) $order->get_meta('_wgp_receipt_access_token', true);
+        if ($existing_token !== '') {
             $created_timestamp = (int) $order->get_meta('_wgp_receipt_token_created', true);
             $expiry_timestamp = $created_timestamp + ($this->receipt_token_expiry_days * DAY_IN_SECONDS);
 
             if (time() <= $expiry_timestamp) {
-                $this->log(sprintf('Receipt token already exists and is valid for Order ID: %d', $order_id));
-
-                return;
+                return $existing_token;
             }
         }
 
-        // Generate new receipt token
         $token = $this->generate_receipt_token();
+
         if ($token && $this->store_receipt_token_data($order_id, $token)) {
             $this->log(sprintf('Generated receipt access token for Order ID: %d', $order_id));
+
+            return $token;
         }
+
+        return null;
     }
 
     /**
@@ -294,11 +329,6 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
 
         $receipt_url = home_url("/guest-receipt/{$token}/");
 
-        $invoice_url = '';
-        if (class_exists('WooCommerce_PDF_Invoices')) {
-            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
-        }
-
         $template = $this->resolve_template('guest-receipt-template.php');
 
         if (!$template) {
@@ -310,63 +340,225 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
     }
 
     /**
-     * AJAX handler for sending receipt email.
+     * Adds receipt access section to thank you page / order details.
+     * Hooks into woocommerce_order_details_after_order_table which passes the order object.
      *
+     * Renders the Print Receipt section and/or the email capture form,
+     * depending on the site's Guest Checkout settings (both default on).
+     *
+     * @param WC_Order|int $order_or_id The order object or ID.
      * @return void
      */
-    public function ajax_send_receipt_email(): void
+    public function add_receipt_access_section($order_or_id): void
     {
-        // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'wicket_send_receipt')) {
-            wp_die(__('Security check failed.', 'wicket-wgc'));
-        }
-
-        $token = sanitize_text_field($_POST['token'] ?? '');
-        $email = sanitize_email($_POST['email'] ?? '');
-
-        if (empty($token) || !is_email($email)) {
-            wp_send_json_error([
-                'message' => __('Invalid request. Please provide a valid email address.', 'wicket-wgc'),
-            ]);
-        }
-
-        $order = $this->validate_receipt_token($token);
+        $order = wc_get_order($order_or_id);
         if (!$order instanceof WC_Order) {
-            wp_send_json_error([
-                'message' => __('Invalid or expired receipt link.', 'wicket-wgc'),
-            ]);
+            $this->log('add_receipt_access_section: Invalid order provided.', 'error');
+
+            return;
         }
 
-        // Send receipt email
-        $sent = $this->send_receipt_email($order, $email);
+        // Ensure we are on the Thank You page (Order Received endpoint)
+        if (!is_wc_endpoint_url('order-received')) {
+            return;
+        }
 
-        if ($sent) {
-            wp_send_json_success([
-                'message' => __('Receipt has been sent to your email address.', 'wicket-wgc'),
-            ]);
-        } else {
-            wp_send_json_error([
-                'message' => __('Failed to send receipt. Please try again or contact support.', 'wicket-wgc'),
-            ]);
+        $order_id = $order->get_id();
+
+        if (!$this->is_guest_payment_order($order)) {
+            $this->log(sprintf('Skipping Order ID %d: Not a guest payment order (no token hash or guest user ID).', $order_id));
+
+            return;
+        }
+
+        $show_print = (bool) apply_filters('wicket/wooguestpay/receipt_print_enabled', true);
+        $show_email = (bool) apply_filters('wicket/wooguestpay/receipt_email_enabled', true);
+
+        if (!$show_print && !$show_email) {
+            return;
+        }
+
+        $receipt_token = $show_print ? $this->get_or_generate_receipt_token($order) : null;
+        $receipt_url = (null !== $receipt_token) ? home_url("/guest-receipt/{$receipt_token}/") : '';
+
+        if ('' !== $receipt_url) {
+            $template = $this->resolve_template('guest-receipt-thankyou-section.php');
+
+            if ($template) {
+                include $template;
+            } else {
+                $this->log('Guest receipt thank you template could not be located.', 'error');
+            }
+        }
+
+        if ($show_email) {
+            $this->render_email_capture_form($order);
         }
     }
 
     /**
-     * Sends receipt email to specified address.
+     * Gets the expiry timestamp for the email capture form of an order.
+     *
+     * The form hash is deterministic, so the window is bounded explicitly:
+     * after this point the AJAX handler rejects the form even with a valid hash.
      *
      * @param WC_Order $order The order object.
-     * @param string $email The email address to send to.
+     * @return int|null Absolute expiry timestamp, or null when the order has no creation date (fail closed).
+     */
+    private function get_email_capture_expiry(WC_Order $order): ?int
+    {
+        $created = $order->get_date_created();
+        if (!$created instanceof WC_DateTime) {
+            return null;
+        }
+
+        return $created->getTimestamp() + ($this->email_capture_validity_days * DAY_IN_SECONDS);
+    }
+
+    /**
+     * Renders the email capture form for the thank you page.
+     *
+     * @param WC_Order $order The order object.
+     * @return void
+     */
+    private function render_email_capture_form(WC_Order $order): void
+    {
+        $order_id = $order->get_id();
+        // Deterministic hash so the form survives the logout transition right after payment.
+        // The handler bounds its lifetime to email_capture_validity_days from order creation.
+        $hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
+        $ajax_url = admin_url('admin-ajax.php');
+        ?>
+        <section class="wicket-guest-receipt-email-section" style="margin: 40px 0; padding: 30px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+            <h2 style="color: #333; margin-top: 0; margin-bottom: 15px;">
+                <?php echo esc_html__('Receive Your Payment Receipt', 'wicket-wgc'); ?>
+            </h2>
+            <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
+                <?php echo esc_html__('Enter your email address and we will send you a link to your payment receipt.', 'wicket-wgc'); ?>
+            </p>
+            <form id="wicket-guest-email-form" data-order-id="<?php echo esc_attr((string) $order_id); ?>">
+                <input type="hidden" name="order_id" value="<?php echo esc_attr((string) $order_id); ?>">
+                <input type="hidden" name="auth_hash" value="<?php echo esc_attr($hash); ?>">
+                <input type="email" name="email" required placeholder="you@example.com"
+                       style="padding: 10px 14px; border: 1px solid #ccc; border-radius: 4px; min-width: 260px;">
+                <button type="submit"
+                        style="padding: 11px 24px; background: #28a745; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+                    <?php echo esc_html__('Send Receipt', 'wicket-wgc'); ?>
+                </button>
+            </form>
+            <div class="wicket-guest-email-message" style="margin-top: 15px; font-size: 14px;"></div>
+        </section>
+        <script>
+        jQuery(function ($) {
+            $('#wicket-guest-email-form').on('submit', function (e) {
+                e.preventDefault();
+                var $form = $(this);
+                var $button = $form.find('button[type="submit"]');
+                var $message = $form.closest('.wicket-guest-receipt-email-section').find('.wicket-guest-email-message');
+                $message.text('');
+                // One request in flight at a time; repeat clicks burn the
+                // per-hour send rate limit.
+                $button.prop('disabled', true);
+                $.post('<?php echo esc_js($ajax_url); ?>', {
+                    action: 'wicket_set_guest_email_and_send_receipt',
+                    order_id: $form.find('input[name="order_id"]').val(),
+                    auth_hash: $form.find('input[name="auth_hash"]').val(),
+                    email: $form.find('input[name="email"]').val()
+                }).done(function (response) {
+                    var ok = response && response.success;
+                    var text = (response && response.data && response.data.message) || '';
+                    $message.text(text).css('color', ok ? '#28a745' : '#dc3545');
+                    if (ok) {
+                        $form.find('input[name="email"]').val('');
+                    }
+                }).fail(function () {
+                    $message.text('<?php echo esc_js(__('Something went wrong. Please try again.', 'wicket-wgc')); ?>').css('color', '#dc3545');
+                }).always(function () {
+                    $button.prop('disabled', false);
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+
+    /**
+     * AJAX handler for setting the guest email and sending the receipt.
+     *
+     * @return void
+     */
+    public function ajax_set_guest_email_and_send_receipt(): void
+    {
+        $order_id = absint($_POST['order_id'] ?? 0);
+
+        // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition.
+        // This token depends only on the Order ID and the site's Nonce Salt, making it stable across the logout boundary.
+        $expected_hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
+        $received_hash = (string) ($_POST['auth_hash'] ?? '');
+
+        if (!hash_equals($expected_hash, $received_hash)) {
+            $this->log(sprintf('Security token verification failed. Order ID: %d', $order_id));
+            wp_send_json_error(['message' => __('Security check failed. Please reload the page.', 'wicket-wgc')], 403);
+        }
+
+        // Rate limit: max 3 receipt email sends per order per hour (prevents enumeration / email relay abuse).
+        $rate_key = 'wgp_receipt_send_' . $order_id;
+        $send_attempts = (int) get_transient($rate_key);
+        if ($send_attempts >= 3) {
+            wp_send_json_error(['message' => __('Too many attempts. Please try again later.', 'wicket-wgc')], 429);
+        }
+        set_transient($rate_key, $send_attempts + 1, HOUR_IN_SECONDS);
+
+        $email = sanitize_email($_POST['email'] ?? '');
+        if (!is_email($email)) {
+            wp_send_json_error(['message' => __('Invalid email address.', 'wicket-wgc')]);
+        }
+
+        $order = wc_get_order($order_id);
+        if (!$order instanceof WC_Order) {
+            wp_send_json_error(['message' => __('Order not found.', 'wicket-wgc')]);
+        }
+
+        // The form hash is deterministic, so its usable window is bounded by order age.
+        $expires_at = $this->get_email_capture_expiry($order);
+        if (null === $expires_at || time() > $expires_at) {
+            $this->log(sprintf('Email capture window expired for Order ID: %d', $order_id));
+            wp_send_json_error(['message' => __('This receipt form has expired. Please contact support.', 'wicket-wgc')], 410);
+        }
+
+        // Record the payer's email on the order for reference and admin displays.
+        $order->update_meta_data('_wgp_guest_payment_email', $email);
+        $order->save();
+
+        $token = $this->get_or_generate_receipt_token($order);
+        if (!$token) {
+            wp_send_json_error(['message' => __('Could not create the receipt link. Please contact support.', 'wicket-wgc')]);
+        }
+
+        $sent = $this->send_receipt_email($order, $email, $token);
+
+        if ($sent) {
+            wp_send_json_success(['message' => __('Receipt sent successfully. Please check your inbox.', 'wicket-wgc')]);
+        } else {
+            wp_send_json_error(['message' => __('Failed to send receipt email. Please contact support.', 'wicket-wgc')]);
+        }
+    }
+
+    /**
+     * Sends the receipt email to a specified address.
+     *
+     * @param WC_Order $order The order object.
+     * @param string $email The recipient email address.
+     * @param string $token The receipt access token.
      * @return bool True on success, false on failure.
      */
-    private function send_receipt_email(WC_Order $order, string $email): bool
+    private function send_receipt_email(WC_Order $order, string $email, string $token): bool
     {
         $order_id = $order->get_id();
         $order_number = $order->get_order_number();
 
         $subject = sprintf(__('Receipt for Order #%s', 'wicket-wgc'), $order_number);
-
-        // Build email content
-        $message = $this->get_receipt_email_content($order, $email);
+        $message = $this->get_receipt_email_content($order, $token);
 
         $from_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
 
@@ -387,26 +579,18 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
     }
 
     /**
-     * Gets receipt email content.
+     * Builds the receipt email HTML content.
      *
      * @param WC_Order $order The order object.
-     * @param string $email The recipient email.
-     * @return string The email content.
+     * @param string $token The receipt access token.
+     * @return string The email HTML content.
      */
-    private function get_receipt_email_content(WC_Order $order, string $email): string
+    private function get_receipt_email_content(WC_Order $order, string $token): string
     {
-        $order_id = $order->get_id();
         $order_number = $order->get_order_number();
         $order_date = $order->get_date_created();
         $order_total = $order->get_formatted_order_total();
-        $receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
-        $receipt_url = home_url("/guest-receipt/{$receipt_token}/");
-
-        // Check if PDF invoice plugin is available
-        $invoice_url = '';
-        if (class_exists('WooCommerce_PDF_Invoices')) {
-            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
-        }
+        $receipt_url = home_url("/guest-receipt/{$token}/");
 
         ob_start();
         ?>
@@ -420,7 +604,7 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             <div style="background: #f8f9fa; padding: 30px; border-radius: 8px;">
                 <h2 style="color: #333; margin-bottom: 20px;"><?php echo esc_html(get_bloginfo('name')); ?></h2>
                 <h1 style="color: #0073aa; margin-bottom: 10px;"><?php echo esc_html(__('Payment Receipt', 'wicket-wgc')); ?></h1>
-                <p style="color: #666; margin-bottom: 30px;"><?php echo esc_html(__('Thank you for your payment. Here is your receipt confirmation.', 'wicket-wgc')); ?></p>
+                <p style="color: #666; margin-bottom: 30px;"><?php echo esc_html__('Thank you for your payment. Here is your receipt confirmation.', 'wicket-wgc'); ?></p>
 
                 <div style="background: white; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
                     <h3 style="color: #333; margin-top: 0;"><?php echo esc_html(__('Order Details', 'wicket-wgc')); ?></h3>
@@ -430,216 +614,21 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
                 </div>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <?php if ($invoice_url): ?>
-                        <a href="<?php echo esc_url($invoice_url); ?>"
-                           style="display: inline-block; background: #0073aa; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-bottom: 10px;"
-                           target="_blank">
-                            <?php echo esc_html(__('Download PDF Receipt', 'wicket-wgc')); ?>
-                        </a>
-                        <br>
-                    <?php endif; ?>
                     <a href="<?php echo esc_url($receipt_url); ?>"
-                       style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
-                        <?php echo esc_html(__('View Receipt Online', 'wicket-wgc')); ?>
+                       style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;"
+                       target="_blank">
+                        <?php echo esc_html__('View Receipt Online', 'wicket-wgc'); ?>
                     </a>
                 </div>
 
                 <p style="color: #666; font-size: 14px; text-align: center;">
-                    <?php echo esc_html(__('This receipt link will remain accessible for 30 days.', 'wicket-wgc')); ?>
+                    <?php echo esc_html__('This receipt link will remain accessible for 30 days.', 'wicket-wgc'); ?>
                 </p>
             </div>
         </body>
         </html>
         <?php
-        return ob_get_clean();
-    }
-
-    /**
-     * AJAX handler for setting guest email and sending receipt.
-     */
-    public function ajax_set_guest_email_and_send_receipt(): void
-    {
-        $order_id = absint($_POST['order_id'] ?? 0);
-
-        // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition.
-        // This token depends only on the Order ID and the site's Nonce Salt, making it stable across the logout boundary.
-        $expected_hash = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
-        $received_nonce = $_POST['nonce'] ?? '';
-
-        // Verify the hash
-        if (!hash_equals($expected_hash, $received_nonce)) {
-            $this->log(sprintf('Security token verification failed. Order ID: %d', $order_id));
-            wp_send_json_error(['message' => __('Security check failed. Please reload the page.', 'wicket-wgc')], 403);
-        }
-
-        // Rate limit: max 3 receipt email sends per order per hour (prevents enumeration / email relay abuse).
-        $rate_key     = 'wgp_receipt_send_' . $order_id;
-        $send_attempts = (int) get_transient($rate_key);
-        if ($send_attempts >= 3) {
-            wp_send_json_error(['message' => __('Too many attempts. Please try again later.', 'wicket-wgc')], 429);
-        }
-        set_transient($rate_key, $send_attempts + 1, HOUR_IN_SECONDS);
-
-        $email = sanitize_email($_POST['email'] ?? '');
-        if (!is_email($email)) {
-            wp_send_json_error(['message' => __('Invalid email address.', 'wicket-wgc')]);
-        }
-
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error(['message' => __('Order not found.', 'wicket-wgc')]);
-        }
-
-        // Update the order with the email
-        $order->update_meta_data('_wgp_guest_payment_email', $email);
-        $order->save();
-
-        // Generate receipt token
-        $this->generate_receipt_access_token($order_id);
-
-        // Send receipt email
-        $sent = $this->send_receipt_email($order, $email);
-
-        if ($sent) {
-            wp_send_json_success(['message' => __('Receipt sent successfully.', 'wicket-wgc')]);
-        } else {
-            wp_send_json_error(['message' => __('Failed to send receipt email. Please contact support.', 'wicket-wgc')]);
-        }
-    }
-
-    /**
-     * Adds receipt access section to thank you page.
-     *
-     * @param int $order_id The order ID.
-     * @return void
-     */
-    /**
-     * Adds receipt access section to thank you page / order details.
-     * Hooks into woocommerce_order_details_after_order_table which passes the order object.
-     *
-     * @param WC_Order|int $order_or_id The order object or ID.
-     * @return void
-     */
-    public function add_receipt_access_section($order_or_id): void
-    {
-        $order = wc_get_order($order_or_id);
-        if (!$order instanceof WC_Order) {
-            $this->log('add_receipt_access_section: Invalid order provided.', 'error');
-
-            return;
-        }
-        $order_id = $order->get_id();
-
-        // Ensure we are on the Thank You page (Order Received endpoint)
-        if (!is_wc_endpoint_url('order-received')) {
-            return;
-        }
-
-        $this->log(sprintf('Attempting to add receipt access section for Order ID: %d', $order_id));
-
-        // Check if this is a guest payment order.
-        // We check for token hash (active) OR guest user ID (historical/completed), as hash is removed after payment.
-        if (!$order->get_meta('_wgp_guest_payment_token_hash', true) && !$order->get_meta('_wgp_guest_payment_user_id', true)) {
-            $this->log(sprintf('Skipping Order ID %d: Not a guest payment order (no token hash or guest user ID).', $order_id));
-
-            return;
-        }
-
-        $guest_email = $order->get_meta('_wgp_guest_payment_email', true);
-
-        // CASE 1: No email associated -> Show form to capture it
-        if (empty($guest_email)) {
-            $this->render_email_capture_form($order_id);
-
-            return;
-        }
-
-        // CASE 2: Email associated -> Show receipt link
-        $receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
-        if (!$receipt_token) {
-            // Try to generate it now if it's missing (e.g. if email was added late)
-            $this->generate_receipt_access_token($order_id);
-            $receipt_token = $order->get_meta('_wgp_receipt_access_token', true);
-        }
-
-        if (!$receipt_token) {
-            return;
-        }
-
-        $receipt_url = home_url("/guest-receipt/{$receipt_token}/");
-
-        // Check if PDF invoice plugin is available
-        $invoice_url = '';
-        if (class_exists('WooCommerce_PDF_Invoices')) {
-            $invoice_url = admin_url('admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids=' . $order_id);
-        }
-
-        $template = $this->resolve_template('guest-receipt-thankyou-section.php');
-
-        if (!$template) {
-            $this->log('Guest receipt thank you template could not be located.', 'error');
-
-            return;
-        }
-
-        include $template;
-    }
-
-    /**
-     * Renders the email capture form on the Thank You page.
-     *
-     * @param int $order_id The order ID.
-     */
-    private function render_email_capture_form(int $order_id): void
-    {
-        // Use a custom deterministic hash to avoid session/user context issues during the immediate logout transition
-        $nonce = wp_hash('wicket_guest_receipt_' . $order_id, 'nonce');
-
-        //$this->log(sprintf('Generating receipt token for User ID: %d (Custom Hash)', get_current_user_id()));
-        ?>
-        <div class="wicket-guest-email-capture" style="margin: 20px 0; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
-            <h3><?php esc_html_e('Receive Your Payment Receipt', 'wicket-wgc'); ?></h3>
-            <p><?php esc_html_e('Please enter your email address to receive a copy of your payment receipt.', 'wicket-wgc'); ?></p>
-            <div style="display: flex; gap: 10px; max-width: 500px; flex-wrap: wrap;">
-                <input type="email" id="wicket_guest_capture_email" placeholder="email@example.com" style="flex: 1; padding: 8px; min-width: 200px;">
-                <button type="button" id="wicket_guest_capture_submit" class="button button-primary"><?php esc_html_e('Send Receipt', 'wicket-wgc'); ?></button>
-            </div>
-            <div id="wicket_guest_capture_feedback" style="margin-top: 10px; display: none;"></div>
-        </div>
-        <script type="text/javascript">
-        jQuery(document).ready(function($) {
-            $('#wicket_guest_capture_submit').on('click', function() {
-                var btn = $(this);
-                var email = $('#wicket_guest_capture_email').val();
-                var feedback = $('#wicket_guest_capture_feedback');
-
-                if (!email || email.indexOf('@') === -1) {
-                    alert('<?php echo esc_js(__('Please enter a valid email address.', 'wicket-wgc')); ?>');
-                    return;
-                }
-
-                btn.prop('disabled', true).text('<?php echo esc_js(__('Sending...', 'wicket-wgc')); ?>');
-                feedback.hide();
-
-                $.post('<?php echo admin_url('admin-ajax.php'); ?>', {
-                    action: 'wicket_set_guest_email_and_send_receipt',
-                    nonce: '<?php echo $nonce; ?>',
-                    order_id: <?php echo $order_id; ?>,
-                    email: email
-                }, function(response) {
-                    if (response.success) {
-                        feedback.html('<div class="woocommerce-message" style="margin: 0; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">' + response.data.message + '</div>').show();
-                        $('#wicket_guest_capture_email').prop('disabled', true);
-                        btn.hide();
-                    } else {
-                        feedback.html('<div class="woocommerce-error" style="margin: 0;">' + (response.data.message || 'Error') + '</div>').show();
-                        btn.prop('disabled', false).text('<?php echo esc_js(__('Send Receipt', 'wicket-wgc')); ?>');
-                    }
-                });
-            });
-        });
-        </script>
-        <?php
+        return (string) ob_get_clean();
     }
 
     /**

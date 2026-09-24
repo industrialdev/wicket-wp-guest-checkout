@@ -34,8 +34,9 @@ Wicket Guest Checkout allows WordPress administrators to generate secure payment
 ### Receipt System
 - Post-payment receipt access
 - 30-day receipt link validity
-- Email receipt delivery
-- PDF invoice integration support
+- Printable token-gated receipt page (Print Receipt button)
+- Optional receipt email capture on the thank-you page
+- Print button and email capture are per-site toggles under Wicket Settings > Integrations > Guest Checkout (both enabled by default)
 
 ## Documentation
 
