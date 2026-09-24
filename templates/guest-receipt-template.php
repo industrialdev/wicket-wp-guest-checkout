@@ -41,14 +41,12 @@ get_header();
 				</thead>
 				<tbody>
 					<?php
+    // Render every line item, even when the product was deleted from the
+    // catalog: $item->get_name() falls back to the stored order item name,
+    // and totals still include deleted-product lines.
     foreach ($order->get_items() as $item_id => $item) {
-        $product = $item->get_product();
         $product_name = $item->get_name();
         $quantity = $item->get_quantity();
-
-        if (!$product) {
-            continue;
-        }
         ?>
 						<tr class="<?php echo esc_attr(apply_filters('woocommerce_order_item_class', 'woocommerce-table__line-item order_item', $item, $order)); ?>">
 							<td class="woocommerce-table__product-name product-name">

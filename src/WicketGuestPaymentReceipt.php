@@ -453,8 +453,12 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
             $('#wicket-guest-email-form').on('submit', function (e) {
                 e.preventDefault();
                 var $form = $(this);
+                var $button = $form.find('button[type="submit"]');
                 var $message = $form.closest('.wicket-guest-receipt-email-section').find('.wicket-guest-email-message');
                 $message.text('');
+                // One request in flight at a time; repeat clicks burn the
+                // per-hour send rate limit.
+                $button.prop('disabled', true);
                 $.post('<?php echo esc_js($ajax_url); ?>', {
                     action: 'wicket_set_guest_email_and_send_receipt',
                     order_id: $form.find('input[name="order_id"]').val(),
@@ -469,6 +473,8 @@ class WicketGuestPaymentReceipt extends WicketGuestPaymentComponent
                     }
                 }).fail(function () {
                     $message.text('<?php echo esc_js(__('Something went wrong. Please try again.', 'wicket-wgc')); ?>').css('color', '#dc3545');
+                }).always(function () {
+                    $button.prop('disabled', false);
                 });
             });
         });
