@@ -42,6 +42,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     private const OPTION_WICKET_EMAIL_BODY_TEMPLATE = 'wicket_admin_settings_guest_payment_email_body_template';
     private const OPTION_WICKET_RECEIPT_PRINT_ENABLED = 'wicket_admin_settings_guest_payment_receipt_print_enabled';
     private const OPTION_WICKET_RECEIPT_EMAIL_ENABLED = 'wicket_admin_settings_guest_payment_receipt_email_enabled';
+    private const OPTION_WICKET_RESYNC_REUSED_ORDER_ENABLED = 'wicket_admin_settings_guest_payment_resync_reused_order_enabled';
 
     /**
      * Initialize configuration hooks and filters.
@@ -78,6 +79,9 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
         // Receipt display configuration
         add_filter('wicket/wooguestpay/receipt_print_enabled', [$this, 'filter_receipt_print_enabled'], 10, 1);
         add_filter('wicket/wooguestpay/receipt_email_enabled', [$this, 'filter_receipt_email_enabled'], 10, 1);
+
+        // Reused-order resync configuration
+        add_filter('wicket/wooguestpay/resync_reused_order_enabled', [$this, 'filter_resync_reused_order_enabled'], 10, 1);
     }
 
     /**
@@ -247,6 +251,27 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
     {
         // Absent means never configured: fall through to the default.
         $value = $this->get_wicket_option(self::OPTION_WICKET_RECEIPT_EMAIL_ENABLED, null);
+        if (null !== $value) {
+            return $this->coerce_to_bool($value);
+        }
+
+        return $default_enabled;
+    }
+
+    /**
+     * Filter for enabling the reused-order pricing/shipping resync.
+     *
+     * Default OFF: resyncing mutates stored order money, so it only runs on
+     * sites that opt in (stores that do not rely on manual per-order prices
+     * or mix refunds/renewals into guest-payment links).
+     *
+     * @param bool $default_enabled Default enabled status.
+     * @return bool Filtered enabled status.
+     */
+    public function filter_resync_reused_order_enabled(bool $default_enabled): bool
+    {
+        // Absent means never configured: fall through to the default (off).
+        $value = $this->get_wicket_option(self::OPTION_WICKET_RESYNC_REUSED_ORDER_ENABLED, null);
         if (null !== $value) {
             return $this->coerce_to_bool($value);
         }
@@ -459,6 +484,13 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             'default' => true,
         ]);
 
+        $section->add_option('checkbox', [
+            'name' => self::OPTION_WICKET_RESYNC_REUSED_ORDER_ENABLED,
+            'label' => __('Resync reused order pricing and shipping', 'wicket-wgc'),
+            'description' => __('Before checkout, reprice reused order lines to the payer\'s live pricing (role-based pricing applies in the cart only) and attach the cart\'s chosen shipping rate. Leave off if staff set manual per-order prices, or if guest-payment links are used on refunded or subscription orders.', 'wicket-wgc'),
+            'default' => false,
+        ]);
+
         $section->add_option('text', [
             'name' => self::OPTION_WICKET_EMAIL_SUBJECT_TEMPLATE,
             'label' => __('Email Subject Template', 'wicket-wgc'),
@@ -618,6 +650,7 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
             'token_expiry_days' => $this->filter_token_expiry_days(7),
             'receipt_print_enabled' => $this->filter_receipt_print_enabled(true),
             'receipt_email_enabled' => $this->filter_receipt_email_enabled(true),
+            'resync_reused_order_enabled' => $this->filter_resync_reused_order_enabled(false),
             'email_subject_template' => (string) get_option(
                 self::OPTION_EMAIL_SUBJECT_TEMPLATE,
                 (string) $this->get_wicket_option(
@@ -792,6 +825,12 @@ class WicketGuestPaymentConfig extends WicketGuestPaymentComponent
                 'description' => __('Show the receipt email capture form on the thank you page for guest payers', 'wicket-wgc'),
                 'enabled' => $this->filter_receipt_email_enabled(true),
                 'option' => self::OPTION_WICKET_RECEIPT_EMAIL_ENABLED,
+            ],
+            'resync_reused_order_enabled' => [
+                'label' => __('Resync Reused Order', 'wicket-wgc'),
+                'description' => __('Reprice reused order lines to the payer\'s live pricing and attach the cart\'s chosen shipping before checkout', 'wicket-wgc'),
+                'enabled' => $this->filter_resync_reused_order_enabled(false),
+                'option' => self::OPTION_WICKET_RESYNC_REUSED_ORDER_ENABLED,
             ],
             'email_subject_template' => [
                 'label' => __('Email Subject Template', 'wicket-wgc'),

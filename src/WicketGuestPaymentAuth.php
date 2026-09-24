@@ -8,7 +8,9 @@ use Exception;
 use WC_Checkout;
 use WC_Order;
 use WC_Order_Item_Product;
+use WC_Order_Item_Shipping;
 use WC_Product;
+use WC_Shipping_Rate;
 use WP_Error;
 
 /*
@@ -640,8 +642,10 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
      * the cart's PRODUCT surplus into the order additively for simple orders,
      * then blocks on shipping/fee drift or total drift that it does not sync.
      *
-     * Original order line items are never mutated; only items tagged
-     * _wgp_synced_from_cart are added or removed to track the cart surplus.
+     * Original order line items are never mutated by the product sync; only
+     * items tagged _wgp_synced_from_cart are added or removed to track the
+     * cart surplus. An optional opt-in resync (resync_reused_order_to_cart)
+     * may additionally reprice original lines and attach cart shipping.
      *
      * @param WC_Order $order The reused guest-payment order.
      * @return array|null Null to allow checkout. ['code'=>string,'message'=>string] to block.
@@ -697,6 +701,17 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
             ];
         }
 
+        // 2.5) Optional resync (site opt-in, default off): mirror the cart's
+        //      repriced lines and chosen shipping into the reused order so
+        //      pricing-context drift (role-based pricing applies in the cart
+        //      only) and missing shipping do not read as a charge mismatch.
+        //      Unsupported orders are left untouched; the total net below
+        //      still fails closed.
+        $resync_block = $this->resync_reused_order_to_cart($order);
+        if ($resync_block !== null) {
+            return $resync_block;
+        }
+
         // 3) Total net: after the product sync the order total must equal the cart
         //    total. Catches any charge we did not sync (tax-location drift, a fee).
         $cart_total = $cart ? (float) $cart->get_total('edit') : 0.0;
@@ -712,6 +727,181 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
         $this->log(sprintf('CART SYNC: allowing checkout for order #%d. Order total: %s, cart total: %s.', $order_id, $order->get_total(), $cart ? $cart->get_total('edit') : 'null'));
 
         return null;
+    }
+
+    /**
+     * Optional resync of a reused order to the payer's live pricing context.
+     *
+     * Role-based pricing plugins reprice cart items only (they hook
+     * woocommerce_before_calculate_totals), and prepare_cart_from_order does
+     * not carry shipping, so a reused order can hold stale line prices and no
+     * shipping while the rebuilt cart totals differently. When the site opts
+     * in via wicket/wooguestpay/resync_reused_order_enabled (default off),
+     * mirror the cart's line totals onto matching original order lines and
+     * attach the cart's chosen shipping rate, then recalculate.
+     *
+     * Unsupported orders (refunded, subscription-related) are left untouched
+     * and the caller's total net still fails closed. Tax is never mirrored:
+     * if the cart computed tax, the order must reproduce it through its own
+     * calculation, otherwise checkout blocks (tax_sync_failed). A resync that
+     * hid a missing tax charge would be worse than the block it replaces.
+     *
+     * @param WC_Order $order The reused guest-payment order.
+     * @return array|null Null to allow checkout. ['code'=>string,'message'=>string] to block.
+     */
+    private function resync_reused_order_to_cart(WC_Order $order): ?array
+    {
+        if (!apply_filters('wicket/wooguestpay/resync_reused_order_enabled', false)) {
+            return null;
+        }
+
+        $cart = WC()->cart;
+        if (!$cart) {
+            return null;
+        }
+
+        $order_id = $order->get_id();
+
+        // Orders with payment history or subscription linkage keep their
+        // stored money: repricing them risks corrupting refund accounting or
+        // desyncing a renewal from its subscription's recurring amount.
+        if ((float) $order->get_total_refunded() > 0.0) {
+            $this->log(sprintf('CART RESYNC: order #%d has refunds; skipping resync.', $order_id));
+
+            return null;
+        }
+        if (function_exists('wcs_get_subscriptions_for_order') && wcs_get_subscriptions_for_order($order)) {
+            $this->log(sprintf('CART RESYNC: order #%d is subscription-related; skipping resync.', $order_id));
+
+            return null;
+        }
+        // Defensive: only simple orders reach this net (the shipping/fee net
+        // returns earlier), but never touch an order carrying shipping/fees.
+        if (count($order->get_shipping_methods()) > 0 || count($order->get_fees()) > 0) {
+            return null;
+        }
+
+        // --- Phase 1: plan. No mutation. ---
+        $cart_items = [];
+        foreach ($cart->get_cart() as $cart_item) {
+            $pid = (int) ($cart_item['product_id'] ?? 0);
+            $vid = (int) ($cart_item['variation_id'] ?? 0);
+            if (!$pid) {
+                continue;
+            }
+            $cart_items[$pid . ':' . $vid] = $cart_item;
+        }
+
+        $reprices = [];  // [WC_Order_Item_Product, subtotal, total]
+        foreach ($order->get_items() as $item) {
+            if (!($item instanceof WC_Order_Item_Product) || $item->get_meta('_wgp_synced_from_cart')) {
+                continue;  // synced lines already mirror the cart
+            }
+            $key = (int) $item->get_product_id() . ':' . (int) $item->get_variation_id();
+            $cart_item = $cart_items[$key] ?? null;
+            if ($cart_item === null || (float) $item->get_quantity() !== (float) ($cart_item['quantity'] ?? 0)) {
+                continue;  // not mirrorable; the total net decides
+            }
+            $subtotal = isset($cart_item['line_subtotal']) ? (float) $cart_item['line_subtotal'] : null;
+            $total = isset($cart_item['line_total']) ? (float) $cart_item['line_total'] : null;
+            if ($subtotal === null || $total === null) {
+                continue;
+            }
+            if (abs((float) $item->get_subtotal() - $subtotal) <= 0.01 && abs((float) $item->get_total() - $total) <= 0.01) {
+                continue;  // already at the live price
+            }
+            $reprices[] = [$item, $subtotal, $total];
+        }
+
+        $shipping_item = $this->cart_chosen_shipping_rate_item();
+
+        // Nothing to apply.
+        if ($reprices === [] && $shipping_item === null) {
+            return null;
+        }
+
+        // --- Phase 2: apply. ---
+        try {
+            foreach ($reprices as [$item, $subtotal, $total]) {
+                $old_total = $item->get_total();
+                $item->set_subtotal($subtotal);
+                $item->set_total($total);
+                $this->log(sprintf('CART RESYNC: order #%d line %d (product %d:%d) repriced %s -> %s.', $order_id, $item->get_id(), $item->get_product_id(), $item->get_variation_id(), $old_total, $total));
+            }
+            if ($shipping_item !== null) {
+                $order->add_item($shipping_item);
+                $this->log(sprintf('CART RESYNC: order #%d attached cart shipping "%s" (%s).', $order_id, $shipping_item->get_method_title(), $shipping_item->get_total()));
+            }
+            // calculate_totals() also recomputes taxes on every line from the
+            // order's stored tax address, mirroring the product sync path.
+            $order->calculate_totals();
+            $order->save();
+        } catch (\Throwable $e) {
+            // In-memory mutation only (save() runs last); the total net below
+            // compares reality and fails closed on a half-applied resync.
+            $this->log(sprintf('CART RESYNC: order #%d resync threw %s: %s. Deferring to the total net.', $order_id, get_class($e), $e->getMessage()), 'error');
+
+            return null;
+        }
+
+        // Independent tax fail-closed net: the resync never mirrors tax. If
+        // the cart computed tax, the order must reproduce it on its own.
+        $cart_tax = (float) $cart->get_total_tax();
+        if ($cart_tax > 0.01 && (float) $order->get_total_tax() <= 0.01) {
+            $this->log(sprintf('CART DIVERGENCE: order #%d has no tax after resync while the cart computed %s. Blocking.', $order_id, $cart_tax), 'error');
+
+            return [
+                'code' => 'tax_sync_failed',
+                'message' => __('We could not update this order. Please try your payment link again, or contact us to complete your purchase.', 'wicket-wgc'),
+            ];
+        }
+
+        $this->log(sprintf('CART RESYNC: order #%d resynced. New order total: %s, cart total: %s.', $order_id, $order->get_total(), $cart->get_total('edit')));
+
+        return null;
+    }
+
+    /**
+     * Build a shipping order item from the cart's chosen rate, if one resolved.
+     *
+     * Runs after cart totals were calculated, so the shipping packages cache
+     * is populated and the chosen method (or the first quoted rate) is the
+     * same rate the cart total includes.
+     *
+     * @return WC_Order_Item_Shipping|null Null when the cart carries no shipping.
+     */
+    private function cart_chosen_shipping_rate_item(): ?WC_Order_Item_Shipping
+    {
+        if (!WC()->shipping instanceof \WC_Shipping) {
+            return null;
+        }
+
+        $chosen = WC()->session ? (array) WC()->session->get('chosen_shipping_methods') : [];
+        $rate = null;
+        foreach (WC()->shipping->get_packages() as $package) {
+            $rates = $package['rates'] ?? [];
+            if ($rates === []) {
+                continue;
+            }
+            $key = $chosen[0] ?? '';
+            $rate = ($key !== '' && isset($rates[$key])) ? $rates[$key] : reset($rates);
+            break;
+        }
+
+        if (!$rate instanceof WC_Shipping_Rate) {
+            return null;
+        }
+
+        $item = new WC_Order_Item_Shipping();
+        $item->set_props([
+            'method_title' => $rate->get_label(),
+            'method_id' => $rate->get_method_id(),
+            'instance_id' => $rate->get_instance_id(),
+            'total' => $rate->get_cost(),
+            'taxes' => $rate->get_taxes(),
+        ]);
+
+        return $item;
     }
 
     /**
