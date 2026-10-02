@@ -36,7 +36,19 @@ if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
     if (defined('SECURE_AUTH_KEY') && defined('AUTH_KEY')) {
         define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', \SECURE_AUTH_KEY . \AUTH_KEY);
     } else {
-        define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'fallback-key-please-define-in-wp-config');
+        // Fail closed (WWID-2665): with no wp-config key and no site salts
+        // there is no safe key to derive. The public literal must never
+        // encrypt guest payment tokens outside local development. Token
+        // encryption stays disabled (the constant is simply not defined)
+        // until a key is configured.
+        $is_local_env = function_exists('wp_get_environment_type')
+            ? in_array(wp_get_environment_type(), ['local', 'development'], true)
+            : false;
+        if ($is_local_env) {
+            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'fallback-key-please-define-in-wp-config');
+        } else {
+            error_log('wicket-guest-checkout: WICKET_GUEST_PAYMENT_ENCRYPTION_KEY is not defined and SECURE_AUTH_KEY/AUTH_KEY are missing; guest payment token encryption is disabled. Define the key in wp-config.php.');
+        }
     }
 }
 if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {

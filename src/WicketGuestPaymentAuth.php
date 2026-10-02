@@ -1971,16 +1971,9 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
 
     private function get_user_ip_address(): string
     {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            //ip from share internet
-            $ip = $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            //ip pass from proxy
-            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-        } else {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        }
-
-        return sanitize_text_field($ip);
+        // REMOTE_ADDR only (WWID-2665). HTTP_CLIENT_IP and X-Forwarded-For are
+        // client-controlled: trusting them let a guest rotate the
+        // guest_pay_limit_{ip} rate-limit key by rotating request headers.
+        return sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
     }
 }
