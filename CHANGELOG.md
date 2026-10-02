@@ -5,6 +5,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.4.1] - 2026-10-02
+
+### Fixed
+- **security:** REMOTE_ADDR-only rate limits and fail closed on missing key (WWID-2665)
+
+### Maintenance
+- **ci:** fail closed when main moves before release push
+
+
 ## [1.4.0] - 2026-09-24
 
 ### Added
