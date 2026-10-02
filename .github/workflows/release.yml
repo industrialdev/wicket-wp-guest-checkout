@@ -110,6 +110,16 @@ jobs:
           git add composer.json CHANGELOG.md ./*.php
           git commit -m "chore(release): ${NEW_VERSION}"
           git tag "${NEW_VERSION}"
-          git push origin HEAD:main
+
+          # The push is an atomic compare-and-swap: it fails when main moved
+          # since checkout (merge landing mid-run, or a rerun of an old run;
+          # reruns pin the original commit). Give the next steps, not raw git.
+          if ! git push origin HEAD:main; then
+            echo "::error::Push rejected: main moved since checkout (concurrent merge, or a rerun of an old run)."
+            echo "::error::Reruns pin the original commit and cannot succeed once main has moved; do not rerun this job."
+            echo "::error::If no later release published this version, trigger a fresh release from current main."
+            exit 1
+          fi
+
           git push origin "refs/tags/${NEW_VERSION}"
           echo "::notice::Released ${NEW_VERSION}"
