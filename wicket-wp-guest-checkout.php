@@ -111,7 +111,7 @@ function wicket_guest_checkout_encryption_key_notice(): void
         return;
     }
     echo '<div class="notice notice-error"><p>'
-        . esc_html__('Wicket Guest Checkout: define WICKET_GUEST_PAYMENT_ENCRYPTION_KEY (or SECURE_AUTH_KEY/AUTH_KEY) in wp-config.php — guest payment token encryption is disabled until then.', 'wicket-wgc')
+        . esc_html__('Wicket Guest Checkout: define WICKET_GUEST_PAYMENT_ENCRYPTION_KEY (or SECURE_AUTH_KEY/AUTH_KEY) in wp-config.php, guest payment token encryption is disabled until then.', 'wicket-wgc')
         . '</p></div>';
 }
 

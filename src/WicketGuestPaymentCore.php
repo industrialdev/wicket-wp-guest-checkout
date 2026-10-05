@@ -1608,7 +1608,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     {
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') || !defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Encryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config. Data: %s', $data),
+                sprintf('Encryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config'),
                 'error'
             );
 
@@ -1629,7 +1629,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $encrypted = openssl_encrypt($data, $method, $key, OPENSSL_RAW_DATA, $iv);
         if ($encrypted === false) {
             $this->log(
-                sprintf('Encryption Error: openssl_encrypt failed. Data: %s', $data),
+                sprintf('Encryption Error: openssl_encrypt failed'),
                 'error'
             );
 
@@ -1652,7 +1652,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     {
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') || !defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Decryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config. Data: %s', $data),
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config'),
                 'error'
             );
 
@@ -1674,7 +1674,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     {
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config. Data: %s', $data),
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config'),
                 'error'
             );
 
@@ -1685,7 +1685,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $decoded_data = base64_decode($data, true);
         if ($decoded_data === false) {
             $this->log(
-                sprintf('Decryption Error: Invalid base64 input. Data: %s', $data),
+                sprintf('Decryption Error: Invalid base64 input'),
                 'error'
             );
 
@@ -1704,7 +1704,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         if (mb_strlen($decoded_data, '8bit') < $iv_length) {
             $this->log(
-                sprintf('Decryption Error: Encrypted data too short. Data: %s', $data),
+                sprintf('Decryption Error: Encrypted data too short'),
                 'error'
             );
 
@@ -1718,7 +1718,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         if ($decrypted === false) {
             if ($this->should_log_decryption_error()) {
                 $this->log(
-                    sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data. Data: %s', $data),
+                    sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data'),
                     'error'
                 );
             }
