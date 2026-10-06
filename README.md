@@ -108,6 +108,23 @@ add_filter('wicket/wooguestpay/email_integration_enabled', function($enabled, $o
 }, 10, 2);
 ```
 
+### Encryption key and legacy token migration
+
+Since the WWID-2665 bootstrap fix, production sites no longer get a derived fallback key. The plugin derives `WICKET_GUEST_PAYMENT_ENCRYPTION_KEY` from `SECURE_AUTH_KEY . AUTH_KEY` in `wp-config.php`, or uses a direct `WICKET_GUEST_PAYMENT_ENCRYPTION_KEY` definition. Local and development sites without salts keep a site-derived key. Production and staging sites with no usable key fail closed: new payment links cannot be issued, and existing links validate only if keys are supplied through the filter described below. Salts left at the WordPress sample value (`put your unique phrase here`) or the Wicket baseline default (`generateme`) count as missing.
+
+Sites that ran an earlier release signed payment links with whichever key the old code derived at the time: the fallback `sha256( site_url + admin_email + 'wicket-wgc-enc' )` on sites without salts, or the concatenated placeholder literals on sites that kept the sample or baseline salt values. Those links stop validating after the upgrade. To keep honoring them during a transition, supply the legacy key through the `wicket_guest_payment_encryption_keys` filter in a mu-plugin or the site integration plugin:
+
+```php
+add_filter('wicket_guest_payment_encryption_keys', function ($keys) {
+    $keys = (array) $keys;
+    $keys[] = hash('sha256', get_site_url() . get_option('admin_email') . 'wicket-wgc-enc');
+
+    return $keys;
+});
+```
+
+Filter keys enable token validation and decryption for existing links. Issuing new payment links still requires the constant (or usable salts) in `wp-config.php`; the filter cannot replace it for issuance. The filter replaces the whole key list, so a callback should append the legacy key to the incoming `$keys`. Remove the legacy filter entry once old links have expired or been reissued.
+
 ### Default Configuration
 
 - **Order Statuses Allowed:** `pending`, `failed`, `on-hold`
@@ -229,6 +246,10 @@ apply_filters('wicket_guest_payment_email_content', $html, $order, $token, $plac
 
 // Customize email headers (6 args)
 apply_filters('wicket_guest_payment_email_headers', $headers, $order, $token, $placeholders, $recipient_email, $user_data);
+
+// Replace the key list used for token validation/decryption (array or string;
+// $keys holds the wp-config key, append to it rather than dropping it)
+apply_filters('wicket_guest_payment_encryption_keys', $keys);
 ```
 
 ## Development
