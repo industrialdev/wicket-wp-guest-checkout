@@ -29,28 +29,8 @@ use WC_Product_Variation;
 // No direct access
 defined('ABSPATH') || exit;
 
-// Define encryption keys if not already defined
-// If you want to define them yourself to be different for security reasons, add them to wp-config.php
-if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')) {
-    // Use wp-config.php SECURE_AUTH_KEY + AUTH_KEY for encryption
-    if (defined('SECURE_AUTH_KEY') && defined('AUTH_KEY')) {
-        define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', \SECURE_AUTH_KEY . \AUTH_KEY);
-    } else {
-        // Fail closed (WWID-2665): with no wp-config key and no site salts
-        // there is no safe key to derive. The public literal must never
-        // encrypt guest payment tokens outside local development. Token
-        // encryption stays disabled (the constant is simply not defined)
-        // until a key is configured.
-        $is_local_env = function_exists('wp_get_environment_type')
-            ? in_array(wp_get_environment_type(), ['local', 'development'], true)
-            : false;
-        if ($is_local_env) {
-            define('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY', 'fallback-key-please-define-in-wp-config');
-        } else {
-            error_log('wicket-guest-checkout: WICKET_GUEST_PAYMENT_ENCRYPTION_KEY is not defined and SECURE_AUTH_KEY/AUTH_KEY are missing; guest payment token encryption is disabled. Define the key in wp-config.php.');
-        }
-    }
-}
+// Encryption key bootstrap lives in the MAIN plugin file (WWID-2665): it
+// runs before this autoloader, so a gate here could never execute.
 if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
     define('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD', 'aes-256-cbc');
 }

@@ -1391,8 +1391,10 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
             return null; // Essential data missing
         }
 
-        // Decrypt the token
-        $token = $encrypted_token ? $this->decrypt_data($encrypted_token) : false;
+        // Decrypt the token, verifying each candidate against the stored
+        // HMAC so a wrong key cannot satisfy decryption with garbage.
+        $token_hash = (string) $order->get_meta('_wgp_guest_payment_token_hash', true);
+        $token = $encrypted_token ? $this->decrypt_data($encrypted_token, $token_hash !== '' ? $token_hash : null) : false;
 
         if ($token === false) {
             if ($this->should_log_decryption_error()) {
@@ -1608,7 +1610,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     {
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') || !defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Encryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config. Data: %s', $data),
+                sprintf('Encryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config'),
                 'error'
             );
 
@@ -1629,7 +1631,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $encrypted = openssl_encrypt($data, $method, $key, OPENSSL_RAW_DATA, $iv);
         if ($encrypted === false) {
             $this->log(
-                sprintf('Encryption Error: openssl_encrypt failed. Data: %s', $data),
+                sprintf('Encryption Error: openssl_encrypt failed'),
                 'error'
             );
 
@@ -1643,24 +1645,68 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     /**
      * Decrypts data encrypted with encrypt_data.
      *
-     * Requires WICKET_GUEST_PAYMENT_ENCRYPTION_KEY and WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD to be defined.
+     * Tries every configured key: the wp-config constant first, then any
+     * keys supplied through the wicket_guest_payment_encryption_keys
+     * filter. This keeps tokens readable across a key transition (for
+     * example the WWID-2665 legacy-key migration) instead of breaking them
+     * the moment the wp-config key changes.
      *
-     * @param string $data Base64 encoded encrypted string (IV prepended).
+     * AES-CBC is unauthenticated, so a wrong key can decrypt to
+     * padding-valid garbage. When $expected_hash is given, each candidate
+     * is verified against it (HMAC-SHA256 keyed with the candidate's own
+     * key) before it is trusted; a mismatch moves on to the next key.
+     *
+     * @param string      $data          Base64 encoded encrypted string (IV prepended).
+     * @param string|null $expected_hash Stored _wgp_guest_payment_token_hash HMAC, when known.
      * @return string|false Decrypted data or false on failure/tampering.
      */
-    public function decrypt_data(string $data): string|false
+    public function decrypt_data(string $data, ?string $expected_hash = null): string|false
     {
-        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY') || !defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
+        if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Decryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config. Data: %s', $data),
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config'),
                 'error'
             );
 
             return false;
         }
-        $key = WICKET_GUEST_PAYMENT_ENCRYPTION_KEY;
 
-        return $this->decrypt_data_with_key($data, (string) $key);
+        $keys = $this->get_encryption_keys();
+        if ($keys === []) {
+            $this->log(
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Key or Method not defined in wp-config'),
+                'error'
+            );
+
+            return false;
+        }
+
+        $saw_decryption_failure = false;
+        foreach ($keys as $key) {
+            $decrypted = $this->decrypt_data_with_key($data, $key, log_failures: false);
+            if ($decrypted === false) {
+                $saw_decryption_failure = true;
+
+                continue;
+            }
+
+            if ($expected_hash !== null
+                && !hash_equals($expected_hash, hash_hmac('sha256', $decrypted, $key))
+            ) {
+                continue;
+            }
+
+            return $decrypted;
+        }
+
+        if ($saw_decryption_failure && $this->should_log_decryption_error()) {
+            $this->log(
+                sprintf('Decryption Error: no configured key produced a verified token. Possible wrong key or tampered data'),
+                'error'
+            );
+        }
+
+        return false;
     }
 
     /**
@@ -1668,13 +1714,16 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
      *
      * @param string $data Base64 encoded encrypted string (IV prepended).
      * @param string $key Encryption key.
+     * @param bool   $log_failures Log a decryption error when openssl fails. The
+     *                             multi-key loop in decrypt_data() passes false
+     *                             and logs once after all keys fail.
      * @return string|false Decrypted data or false on failure/tampering.
      */
-    private function decrypt_data_with_key(string $data, string $key): string|false
+    private function decrypt_data_with_key(string $data, string $key, bool $log_failures = true): string|false
     {
         if (!defined('WICKET_GUEST_PAYMENT_ENCRYPTION_METHOD')) {
             $this->log(
-                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config. Data: %s', $data),
+                sprintf('Decryption Error: WICKET Guest Payment Encryption Method not defined in wp-config'),
                 'error'
             );
 
@@ -1685,7 +1734,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $decoded_data = base64_decode($data, true);
         if ($decoded_data === false) {
             $this->log(
-                sprintf('Decryption Error: Invalid base64 input. Data: %s', $data),
+                sprintf('Decryption Error: Invalid base64 input'),
                 'error'
             );
 
@@ -1704,7 +1753,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
 
         if (mb_strlen($decoded_data, '8bit') < $iv_length) {
             $this->log(
-                sprintf('Decryption Error: Encrypted data too short. Data: %s', $data),
+                sprintf('Decryption Error: Encrypted data too short'),
                 'error'
             );
 
@@ -1716,9 +1765,9 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         $decrypted = openssl_decrypt($ciphertext, $method, $key, OPENSSL_RAW_DATA, $iv);
 
         if ($decrypted === false) {
-            if ($this->should_log_decryption_error()) {
+            if ($log_failures && $this->should_log_decryption_error()) {
                 $this->log(
-                    sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data. Data: %s', $data),
+                    sprintf('Decryption Error: openssl_decrypt failed. Possible wrong key or tampered data'),
                     'error'
                 );
             }
