@@ -5,6 +5,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.5.0] - 2026-10-07
+
+### Fixed
+- **security:** resolve encryption-gate review round (WWID-2665)
+- **security:** never log token payloads on encryption errors (WWID-2665)
+- **bootstrap:** make the encryption fail-closed gate reachable (WWID-2665)
+
+
 ## [1.4.1] - 2026-10-02
 
 ### Fixed
