@@ -8,6 +8,10 @@ WordPress/WooCommerce plugin that enables secure guest payment functionality thr
 
 For architecture (system flow, class responsibilities, data storage keys, security patterns, WooCommerce integration points, constants, activation behavior) and the testing setup: `@see atlas://packages/wicket-wp-guest-checkout.md`.
 
+## Documentation
+
+The Atlas knowledge base holds the full engineering and product documentation for the whole Wicket stack. Start at `@see atlas://packages/wicket-wp-guest-checkout.md` for this package. The repo docs/ folder, when present, holds only public end-consumer guides; engineering material never lives beside the code.
+
 ## Development Commands
 
 ```bash
