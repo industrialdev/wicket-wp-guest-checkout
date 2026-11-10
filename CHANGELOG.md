@@ -5,6 +5,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.5.1] - 2026-11-10
+
+### Fixed
+- **auth:** reset stale guest session cache before cart prep (WWID-1553) (#17)
+
+### Documentation
+- adopt the stack PR template format #norelease
+- point AGENTS.md at the atlas knowledge base rule
+- streamline AGENTS.md and move detail to atlas
+
+### Maintenance
+- **docs:** move engineering docs to atlas (A0012)
+
+
 ## [1.5.0] - 2026-10-07
 
 ### Fixed
