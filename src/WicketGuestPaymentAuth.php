@@ -1353,6 +1353,8 @@ class WicketGuestPaymentAuth extends WicketGuestPaymentComponent
                     // Store the original order ID associated with this token for later invalidation
                     update_user_meta($user_id, '_wgp_original_order_id', $order->get_id());
 
+                    WicketGuestPaymentCore::reset_session_cache();
+
                     // Set the temporary guest session flag cookie
                     // Sync expiry with WC default session (48 hours) to prevent dual-expiry regressions
                     $cookie_expiry = (int) apply_filters('wc_session_expiration', 2 * DAY_IN_SECONDS);

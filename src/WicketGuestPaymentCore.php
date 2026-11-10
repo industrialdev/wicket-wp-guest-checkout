@@ -1908,7 +1908,7 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
         // GATE: Only proceed to check metadata if we have clear evidence of a guest flow.
         // This prevents regular members with stale meta from being trapped in a guest session.
         // Evidence 1: URL triggers used to initiate or transit the flow.
-        $has_url_trigger = !empty($_GET['guest_payment_token']) || !empty($_GET['wgp_cart_key']);
+        $has_url_trigger = null !== $this->extract_guest_payment_token_from_request() || !empty($_GET['wgp_cart_key']);
 
         // Evidence 2: Active order in the WC session matches the original guest order in meta.
         // This ensures continuity on Checkout/Thank You pages even if the cookie is lost.
