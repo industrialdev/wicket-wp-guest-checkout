@@ -1496,6 +1496,16 @@ class WicketGuestPaymentCore extends WicketGuestPaymentComponent
     // Encryption/Decryption Helpers
 
     /**
+     * Whether new token issuance is possible: encrypt_data() refuses without
+     * the wp-config constant, while filter-supplied keys only extend validation.
+     */
+    public function encryption_key_configured(): bool
+    {
+        return defined('WICKET_GUEST_PAYMENT_ENCRYPTION_KEY')
+            && (string) WICKET_GUEST_PAYMENT_ENCRYPTION_KEY !== '';
+    }
+
+    /**
      * Get current and legacy encryption keys for token validation.
      *
      * @return array<int, string>

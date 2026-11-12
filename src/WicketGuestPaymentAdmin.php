@@ -185,6 +185,14 @@ class WicketGuestPaymentAdmin extends WicketGuestPaymentComponent
 
         $order_id = $order->get_id();
 
+        // Issuance needs the wp-config constant; filter-supplied keys only support validation.
+        if (!$this->core->encryption_key_configured()) {
+            echo '<div class="notice notice-error inline" style="margin: 0 0 10px; padding: 10px;">';
+            echo '<p><strong>' . esc_html__('Guest payment links are disabled.', 'wicket-wgc') . '</strong> ';
+            echo esc_html__('No encryption key is configured on this site: SECURE_AUTH_KEY and AUTH_KEY are missing or still set to default values, so Generate Link will fail. Define WICKET_GUEST_PAYMENT_ENCRYPTION_KEY in wp-config.php, or supply keys via the wicket_guest_payment_encryption_keys filter.', 'wicket-wgc');
+            echo '</p></div>';
+        }
+
         // Add nonce for all actions within this meta box
         wp_nonce_field('guest_payment_actions_' . $order_id, '_wpnonce_guest_payment');
 
