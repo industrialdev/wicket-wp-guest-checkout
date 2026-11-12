@@ -5,6 +5,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- new releases inserted below this line -->
 
+## [1.6.0] - 2026-11-12
+
+### Added
+- **admin:** warn on missing guest payment encryption key (WWID-1553) #minor (#18)
+
+
 ## [1.5.1] - 2026-11-10
 
 ### Fixed
