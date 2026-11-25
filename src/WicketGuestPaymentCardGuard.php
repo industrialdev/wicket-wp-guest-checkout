@@ -80,6 +80,11 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
         // Classic checkout and order-pay: strip save requests, reject saved-card use.
         add_action('woocommerce_checkout_process', [$this, 'sanitize_payment_request'], 0);
         add_action('woocommerce_before_pay_action', [$this, 'sanitize_pay_for_order_request'], 0);
+
+        // Existing subscriptions on the order must not stay automatic, or the gateway copies the payer's card onto them.
+        add_action('woocommerce_checkout_order_processed', [$this, 'force_existing_subscriptions_manual'], 5);
+        add_action('woocommerce_store_api_checkout_order_processed', [$this, 'force_existing_subscriptions_manual'], 5);
+        add_action('woocommerce_before_pay_action', [$this, 'force_existing_subscriptions_manual'], 1);
     }
 
     /**
@@ -167,6 +172,47 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
     }
 
     /**
+     * Set every subscription tied to the order being paid to manual renewal.
+     *
+     * Forcing the Subscriptions options only changes subscriptions created or re-gatewayed
+     * during the request. A subscription that already renews automatically (for example one
+     * left by the member's own earlier attempt, or the parent of a failed renewal) would
+     * keep renewing and gateways would copy the payer's card onto it. Setting it manual
+     * before payment also makes Subscriptions skip its "failed renewal paid" card update.
+     *
+     * @param WC_Order|int $order Order being paid, or its ID.
+     * @return void
+     */
+    public function force_existing_subscriptions_manual($order): void
+    {
+        if (!$this->is_active_guest_session() || !function_exists('wcs_get_subscriptions_for_order')) {
+            return;
+        }
+
+        if (!$order instanceof WC_Order) {
+            $order = wc_get_order((int) $order);
+        }
+
+        if (!$order instanceof WC_Order) {
+            return;
+        }
+
+        $subscriptions = wcs_get_subscriptions_for_order($order, ['order_type' => 'any']);
+
+        foreach ($subscriptions as $subscription) {
+            if ($subscription->get_requires_manual_renewal()) {
+                continue;
+            }
+
+            $subscription->set_requires_manual_renewal(true);
+            $subscription->add_order_note(
+                __('Set to manual renewal because the order was paid through a guest payment link.', 'wicket-wgc')
+            );
+            $subscription->save();
+        }
+    }
+
+    /**
      * Remove "save this card" fields and reject saved-card selections from the request.
      *
      * Field names follow the WooCommerce tokenization convention, so this covers any
@@ -185,10 +231,10 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
             }
 
             if (1 === preg_match('/^wc-.+-payment-token$/', $key)) {
-                $value = is_scalar($_POST[$key]) ? (string) wp_unslash($_POST[$key]) : '';
+                $value = is_string($_POST[$key]) ? wp_unslash($_POST[$key]) : null;
 
-                // 'new' means "enter a new card"; anything else points at a stored token.
-                if ('new' !== $value && '' !== $value) {
+                // Only 'new' means "enter a new card"; an empty, array, or other value points at a stored token.
+                if ('new' !== $value) {
                     wc_add_notice(
                         __('Saved payment methods cannot be used for a guest payment. Please enter a card.', 'wicket-wgc'),
                         'error'
