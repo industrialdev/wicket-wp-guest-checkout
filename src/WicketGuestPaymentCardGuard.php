@@ -79,7 +79,7 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
 
         // Classic checkout and order-pay: strip save requests, reject saved-card use.
         add_action('woocommerce_checkout_process', [$this, 'sanitize_payment_request'], 0);
-        add_action('woocommerce_before_pay_action', [$this, 'sanitize_pay_for_order_request'], 0);
+        add_action('woocommerce_before_pay_action', [$this, 'sanitize_payment_request'], 0);
 
         // Existing subscriptions on the order must not stay automatic, or the gateway copies the payer's card onto them.
         add_action('woocommerce_checkout_order_processed', [$this, 'force_existing_subscriptions_manual'], 5);
@@ -97,7 +97,7 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
      * @param mixed $pre Value that short-circuits the option read, or false.
      * @return mixed 'yes' during a guest session, otherwise the unchanged value.
      */
-    public function force_manual_renewal($pre)
+    public function force_manual_renewal(mixed $pre): mixed
     {
         if (!$this->is_active_guest_session()) {
             return $pre;
@@ -143,32 +143,21 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
     }
 
     /**
-     * Strip save requests and block saved-card use on classic checkout.
+     * Strip save requests and block saved-card use on classic checkout and the order-pay page.
      *
+     * Hooked to both `woocommerce_checkout_process` (no argument) and
+     * `woocommerce_before_pay_action` (receives the order), which need identical handling.
+     *
+     * @param WC_Order|null $order Order being paid on the order-pay page, or null on classic checkout.
      * @return void
      */
-    public function sanitize_payment_request(): void
+    public function sanitize_payment_request($order = null): void
     {
         if (!$this->is_active_guest_session()) {
             return;
         }
 
-        $this->sanitize_post_data();
-    }
-
-    /**
-     * Strip save requests and block saved-card use on the order-pay page.
-     *
-     * @param WC_Order $order Order being paid.
-     * @return void
-     */
-    public function sanitize_pay_for_order_request($order = null): void
-    {
-        if (!$this->is_active_guest_session()) {
-            return;
-        }
-
-        $this->sanitize_post_data();
+        $this->sanitize_post_data($order instanceof WC_Order ? $order->get_id() : null);
     }
 
     /**
@@ -217,10 +206,12 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
      *
      * Field names follow the WooCommerce tokenization convention, so this covers any
      * gateway that uses it: `wc-{gateway}-new-payment-method` and `wc-{gateway}-payment-token`.
+     * A rejected saved-token attempt is logged so support can trace a payer who reports a blocked checkout.
      *
+     * @param int|null $order_id Order being paid when known, otherwise null.
      * @return void
      */
-    private function sanitize_post_data(): void
+    private function sanitize_post_data(?int $order_id = null): void
     {
         foreach (array_keys($_POST) as $key) {
             $key = (string) $key;
@@ -235,6 +226,11 @@ class WicketGuestPaymentCardGuard extends WicketGuestPaymentComponent
 
                 // Only 'new' means "enter a new card"; an empty, array, or other value points at a stored token.
                 if ('new' !== $value) {
+                    $this->log(
+                        'Rejected a saved payment token during a guest payment session.',
+                        'warning',
+                        ['field' => $key, 'user_id' => get_current_user_id(), 'order_id' => $order_id]
+                    );
                     wc_add_notice(
                         __('Saved payment methods cannot be used for a guest payment. Please enter a card.', 'wicket-wgc'),
                         'error'
