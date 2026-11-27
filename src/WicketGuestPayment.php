@@ -92,6 +92,13 @@ class WicketGuestPayment
     private $auth;
 
     /**
+     * Card guard class instance.
+     *
+     * @var WicketGuestPaymentCardGuard|null
+     */
+    private $card_guard;
+
+    /**
      * Admin functionality class instance.
      *
      * @var WicketGuestPaymentAdmin|null
@@ -235,6 +242,10 @@ class WicketGuestPayment
         // Initialize auth functionality
         $this->auth = new WicketGuestPaymentAuth($this->core);
         $this->auth->init_hooks();
+
+        // Initialize card guard (no card saving during guest payments)
+        $this->card_guard = new WicketGuestPaymentCardGuard($this->core);
+        $this->card_guard->init_hooks();
 
         // Initialize admin functionality (only in admin area)
         if (is_admin()) {
